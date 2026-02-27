@@ -1,0 +1,28 @@
+# PostgreSQL with pgvector and Apache AGE extensions
+FROM pgvector/pgvector:pg16
+
+# Install build dependencies for Apache AGE
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    ca-certificates \
+    libreadline-dev \
+    zlib1g-dev \
+    flex \
+    bison \
+    postgresql-server-dev-16 \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
+
+# Build and install Apache AGE
+RUN git clone --branch release/PG16/1.5.0 --depth 1 https://github.com/apache/age.git /tmp/age \
+    && cd /tmp/age \
+    && make \
+    && make install \
+    && rm -rf /tmp/age
+
+# Copy initialization script
+COPY scripts/init-db.sql /docker-entrypoint-initdb.d/01-init-db.sql
+
+# Set environment
+ENV POSTGRES_HOST_AUTH_METHOD=scram-sha-256
