@@ -131,12 +131,18 @@ The server will be available at `http://localhost:8001`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | Required | PostgreSQL connection string |
-| `OPENAI_API_KEY` | Required | OpenAI API key for embeddings |
-| `JWT_SECRET` | Required | Secret key for JWT tokens (min 32 chars) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token expiry |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token expiry |
-| `LOG_LEVEL` | `INFO` | Logging level |
+| `DATABASE_URL` | `postgresql+asyncpg://...` | PostgreSQL connection string (async) |
+| `OPENAI_API_KEY` | - | OpenAI API key for embeddings (required for semantic search) |
+| `JWT_SECRET` | `change-me-in-production` | Secret key for JWT tokens (change in production) |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token expiry in minutes |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token expiry in days |
+| `EMBEDDING_MODEL` | `text-embedding-ada-002` | OpenAI embedding model |
+| `EMBEDDING_DIMENSIONS` | `1536` | Embedding vector dimensions |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `DEBUG` | `False` | Enable debug mode |
+| `STORAGE_PATH` | `./storage` | Path for file storage |
+| `RATE_LIMIT_ENABLED` | `True` | Enable rate limiting |
 | `CHUNK_SIZE` | `500` | Tokens per embedding chunk |
 | `CHUNK_OVERLAP` | `50` | Token overlap between chunks |
 
