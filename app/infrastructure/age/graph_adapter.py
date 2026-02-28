@@ -199,18 +199,29 @@ class AgeGraphAdapter:
         target_id: UUID,
         vault_id: UUID,
     ) -> list[dict[str, Any]] | None:
-        """Get shortest path between two documents."""
-        query = """
-        MATCH p = shortestPath(
-            (a:Document {id: $source_id})-[*]-(b:Document {id: $target_id})
-        )
-        UNWIND nodes(p) as node
-        RETURN {id: node.id, title: node.title, path: node.path}
+        """Get shortest path between two documents.
+
+        AGE doesn't support shortestPath(), so we try paths of increasing length.
         """
-        results = await self._execute_cypher(query, {
-            "source_id": str(source_id),
-            "target_id": str(target_id),
-        })
+        # Try paths of increasing length (BFS simulation)
+        for max_hops in range(1, 6):  # Try up to 5 hops
+            query = f"""
+            MATCH p = (a:Document {{id: $source_id}})-[*1..{max_hops}]-(b:Document {{id: $target_id}})
+            UNWIND nodes(p) as node
+            RETURN {{id: node.id, title: node.title, path: node.path}}
+            LIMIT 1
+            """
+            try:
+                results = await self._execute_cypher(query, {
+                    "source_id": str(source_id),
+                    "target_id": str(target_id),
+                })
+                if results:
+                    break
+            except Exception:
+                continue
+        else:
+            results = []
 
         if not results:
             return None
