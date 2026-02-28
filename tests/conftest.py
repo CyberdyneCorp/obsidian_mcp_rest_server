@@ -1,13 +1,8 @@
 """Pytest configuration and shared fixtures."""
 
-import asyncio
-from datetime import datetime
-from typing import AsyncGenerator
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from app.domain.entities.user import User
 from app.domain.entities.vault import Vault
@@ -16,15 +11,6 @@ from app.domain.entities.folder import Folder
 from app.domain.entities.tag import Tag
 from app.domain.entities.document_link import DocumentLink
 from app.domain.entities.embedding_chunk import EmbeddingChunk
-
-
-# Event loop for async tests
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 # Sample data fixtures

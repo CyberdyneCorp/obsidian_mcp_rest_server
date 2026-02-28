@@ -1,11 +1,8 @@
 """Integration test configuration and fixtures."""
 
-import asyncio
 import os
 from typing import AsyncGenerator
-from uuid import uuid4
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -27,18 +24,9 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create event loop for async tests."""
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def engine() -> AsyncGenerator[AsyncEngine, None]:
-    """Create test database engine."""
+    """Create test database engine per test."""
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
@@ -50,10 +38,6 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
-
-    # Drop tables after all tests
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
 
@@ -78,6 +62,10 @@ async def clean_db(session: AsyncSession):
     """Clean database tables before each test."""
     # Delete in correct order to respect foreign keys
     tables = [
+        "document_table_links",
+        "table_relationships",
+        "table_rows",
+        "data_tables",
         "document_tags",
         "embedding_chunks",
         "document_links",
@@ -89,7 +77,10 @@ async def clean_db(session: AsyncSession):
     ]
 
     for table in tables:
-        await session.execute(text(f"DELETE FROM {table}"))
+        try:
+            await session.execute(text(f"DELETE FROM {table}"))
+        except Exception:
+            pass  # Table might not exist
 
     await session.commit()
 
