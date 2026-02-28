@@ -31,5 +31,19 @@ class VaultModel(Base):
     tags = relationship("TagModel", back_populates="vault", cascade="all, delete-orphan")
     links = relationship("DocumentLinkModel", back_populates="vault", cascade="all, delete-orphan")
 
+    # Structured data relationships
+    data_tables = relationship(
+        "DataTableModel", back_populates="vault", cascade="all, delete-orphan"
+    )
+    table_rows = relationship(
+        "TableRowModel", back_populates="vault", cascade="all, delete-orphan"
+    )
+    table_relationships = relationship(
+        "TableRelationshipModel", back_populates="vault", cascade="all, delete-orphan"
+    )
+    document_table_links = relationship(
+        "DocumentTableLinkModel", back_populates="vault", cascade="all, delete-orphan"
+    )
+
     def __repr__(self) -> str:
         return f"<Vault(id={self.id}, name={self.name})>"

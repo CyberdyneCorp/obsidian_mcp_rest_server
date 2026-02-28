@@ -13,6 +13,8 @@ class LinkType(str, Enum):
     EMBED = "embed"  # ![[Target]]
     HEADER = "header"  # [[Target#Heading]]
     BLOCK = "block"  # [[Target#^block-id]]
+    TABLE = "table"  # [[table:TableName]]
+    TABLE_ROW = "table_row"  # [[row:TableName/uuid]]
 
 
 @dataclass

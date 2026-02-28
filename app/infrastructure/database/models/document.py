@@ -48,6 +48,9 @@ class DocumentModel(Base):
     )
     tags = relationship("DocumentTagModel", back_populates="document", cascade="all, delete-orphan")
     embedding_chunks = relationship("EmbeddingChunkModel", back_populates="document", cascade="all, delete-orphan")
+    table_links = relationship(
+        "DocumentTableLinkModel", back_populates="document", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, title={self.title})>"

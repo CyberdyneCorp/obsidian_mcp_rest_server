@@ -15,8 +15,12 @@ from app.infrastructure.database.connection import async_session_maker
 from app.infrastructure.database.repositories import (
     PostgresDocumentLinkRepository,
     PostgresDocumentRepository,
+    PostgresDocumentTableLinkRepository,
     PostgresEmbeddingChunkRepository,
     PostgresFolderRepository,
+    PostgresRelationshipRepository,
+    PostgresRowRepository,
+    PostgresTableRepository,
     PostgresTagRepository,
     PostgresUserRepository,
     PostgresVaultRepository,
@@ -142,6 +146,28 @@ def get_storage_provider() -> LocalStorageAdapter:
     return LocalStorageAdapter()
 
 
+def get_table_repository(session: SessionDep) -> PostgresTableRepository:
+    """Get table repository."""
+    return PostgresTableRepository(session)
+
+
+def get_row_repository(session: SessionDep) -> PostgresRowRepository:
+    """Get row repository."""
+    return PostgresRowRepository(session)
+
+
+def get_relationship_repository(session: SessionDep) -> PostgresRelationshipRepository:
+    """Get relationship repository."""
+    return PostgresRelationshipRepository(session)
+
+
+def get_document_table_link_repository(
+    session: SessionDep,
+) -> PostgresDocumentTableLinkRepository:
+    """Get document table link repository."""
+    return PostgresDocumentTableLinkRepository(session)
+
+
 UserRepoDep = Annotated[PostgresUserRepository, Depends(get_user_repository)]
 VaultRepoDep = Annotated[PostgresVaultRepository, Depends(get_vault_repository)]
 DocumentRepoDep = Annotated[PostgresDocumentRepository, Depends(get_document_repository)]
@@ -152,3 +178,7 @@ EmbeddingRepoDep = Annotated[PostgresEmbeddingChunkRepository, Depends(get_embed
 EmbeddingProviderDep = Annotated[OpenAIEmbeddingAdapter, Depends(get_embedding_provider)]
 GraphProviderDep = Annotated[AgeGraphAdapter, Depends(get_graph_provider)]
 StorageProviderDep = Annotated[LocalStorageAdapter, Depends(get_storage_provider)]
+TableRepoDep = Annotated[PostgresTableRepository, Depends(get_table_repository)]
+RowRepoDep = Annotated[PostgresRowRepository, Depends(get_row_repository)]
+RelationshipRepoDep = Annotated[PostgresRelationshipRepository, Depends(get_relationship_repository)]
+DocumentTableLinkRepoDep = Annotated[PostgresDocumentTableLinkRepository, Depends(get_document_table_link_repository)]

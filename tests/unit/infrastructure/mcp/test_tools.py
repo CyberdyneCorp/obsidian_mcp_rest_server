@@ -9,6 +9,7 @@ import pytest
 from app.application.dto.document_dto import DocumentDTO, DocumentSummaryDTO
 from app.application.dto.search_dto import SearchResultDTO, FulltextSearchResultDTO
 from app.application.dto.link_dto import BacklinkDTO, BacklinkSourceDTO
+from app.application.dto.table_dto import TableSummaryDTO, TableDTO, ColumnDTO, RowDTO
 from app.application.use_cases.graph.get_connections import GraphResultDTO, ConnectionDTO
 from app.domain.entities.vault import Vault
 from app.domain.entities.document import Document
@@ -58,6 +59,12 @@ def mock_dependencies(user_id, vault_id):
     get_backlinks_use_case = AsyncMock()
     get_connections_use_case = AsyncMock()
     list_documents_use_case = AsyncMock()
+    # Table/row use cases
+    list_tables_use_case = AsyncMock()
+    get_table_use_case = AsyncMock()
+    list_rows_use_case = AsyncMock()
+    get_row_use_case = AsyncMock()
+    execute_query_use_case = AsyncMock()
 
     return {
         "current_user_id": user_id,
@@ -68,6 +75,12 @@ def mock_dependencies(user_id, vault_id):
         "get_backlinks_use_case": get_backlinks_use_case,
         "get_connections_use_case": get_connections_use_case,
         "list_documents_use_case": list_documents_use_case,
+        # Table/row use cases
+        "list_tables_use_case": list_tables_use_case,
+        "get_table_use_case": get_table_use_case,
+        "list_rows_use_case": list_rows_use_case,
+        "get_row_use_case": get_row_use_case,
+        "execute_query_use_case": execute_query_use_case,
     }
 
 
@@ -85,6 +98,12 @@ class TestMCPToolsRegistration:
             "get_backlinks",
             "get_connections",
             "list_documents",
+            # Structured data tools
+            "list_tables",
+            "get_table",
+            "list_table_rows",
+            "get_table_row",
+            "query_table",
         ]
 
         for tool_name in expected_tools:
@@ -548,3 +567,289 @@ class TestListDocumentsTool:
 
         assert result["documents"] == []
         assert result["total"] == 0
+
+
+# Structured Data Tools Tests
+
+@pytest.mark.asyncio
+class TestListTablesTool:
+    """Tests for list_tables MCP tool."""
+
+    async def test_list_tables_returns_paginated(
+        self, mock_mcp, mock_dependencies, vault_id
+    ):
+        """Test listing tables returns paginated results."""
+        table_ids = [uuid4() for _ in range(3)]
+
+        mock_dependencies["list_tables_use_case"].execute.return_value = (
+            [
+                TableSummaryDTO(
+                    id=table_ids[i],
+                    name=f"Table {i}",
+                    slug=f"table-{i}",
+                    description=f"Description {i}",
+                    column_count=i + 2,
+                    row_count=(i + 1) * 10,
+                    updated_at=datetime.now(),
+                )
+                for i in range(3)
+            ],
+            3,  # total count
+        )
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["list_tables"](
+            vault_slug="my-vault",
+            limit=100,
+            offset=0,
+        )
+
+        assert "tables" in result
+        assert len(result["tables"]) == 3
+        assert result["total"] == 3
+        assert result["limit"] == 100
+        assert result["offset"] == 0
+
+        # Verify table structure
+        assert result["tables"][0]["id"] == str(table_ids[0])
+        assert result["tables"][0]["name"] == "Table 0"
+        assert result["tables"][0]["row_count"] == 10
+
+    async def test_list_tables_empty_vault(self, mock_mcp, mock_dependencies):
+        """Test listing tables in vault with no tables."""
+        mock_dependencies["list_tables_use_case"].execute.return_value = ([], 0)
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["list_tables"](
+            vault_slug="empty-vault",
+        )
+
+        assert result["tables"] == []
+        assert result["total"] == 0
+
+
+@pytest.mark.asyncio
+class TestGetTableTool:
+    """Tests for get_table MCP tool."""
+
+    async def test_get_table_returns_schema(self, mock_mcp, mock_dependencies, vault_id):
+        """Test getting table returns schema details."""
+        table_id = uuid4()
+
+        mock_dependencies["get_table_use_case"].execute.return_value = TableDTO(
+            id=table_id,
+            name="Contacts",
+            slug="contacts",
+            description="Contact information",
+            columns=[
+                ColumnDTO(name="name", type="text", required=True),
+                ColumnDTO(name="email", type="text", required=True, unique=True),
+                ColumnDTO(name="age", type="number", required=False),
+            ],
+            row_count=150,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["get_table"](
+            vault_slug="my-vault",
+            table_slug="contacts",
+        )
+
+        assert result["id"] == str(table_id)
+        assert result["name"] == "Contacts"
+        assert result["slug"] == "contacts"
+        assert result["description"] == "Contact information"
+        assert len(result["columns"]) == 3
+        assert result["columns"][0]["name"] == "name"
+        assert result["columns"][0]["type"] == "text"
+        assert result["columns"][0]["required"] is True
+        assert result["row_count"] == 150
+
+
+@pytest.mark.asyncio
+class TestListTableRowsTool:
+    """Tests for list_table_rows MCP tool."""
+
+    async def test_list_rows_returns_paginated(
+        self, mock_mcp, mock_dependencies, vault_id
+    ):
+        """Test listing rows returns paginated results."""
+        table_id = uuid4()
+        row_ids = [uuid4() for _ in range(3)]
+        now = datetime.now()
+
+        mock_dependencies["list_rows_use_case"].execute.return_value = (
+            [
+                RowDTO(
+                    id=row_ids[i],
+                    table_id=table_id,
+                    data={"name": f"Item {i}", "value": i * 100},
+                    created_at=now,
+                    updated_at=now,
+                )
+                for i in range(3)
+            ],
+            3,  # total count
+        )
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["list_table_rows"](
+            vault_slug="my-vault",
+            table_slug="items",
+            limit=100,
+            offset=0,
+        )
+
+        assert "rows" in result
+        assert len(result["rows"]) == 3
+        assert result["total"] == 3
+
+        # Verify row structure
+        assert result["rows"][0]["id"] == str(row_ids[0])
+        assert result["rows"][0]["data"]["name"] == "Item 0"
+        assert result["rows"][0]["data"]["value"] == 0
+
+    async def test_list_rows_with_filters(self, mock_mcp, mock_dependencies, vault_id):
+        """Test listing rows with filters."""
+        mock_dependencies["list_rows_use_case"].execute.return_value = ([], 0)
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        await mock_mcp.tools["list_table_rows"](
+            vault_slug="my-vault",
+            table_slug="items",
+            filters={"status": "active"},
+            sort_column="name",
+            sort_order="asc",
+        )
+
+        # Verify filters were passed
+        call_args = mock_dependencies["list_rows_use_case"].execute.call_args
+        assert call_args[1]["filters"] == {"status": "active"}
+        assert call_args[1]["sort_column"] == "name"
+        assert call_args[1]["sort_order"] == "asc"
+
+    async def test_list_rows_with_search(self, mock_mcp, mock_dependencies, vault_id):
+        """Test listing rows with full-text search."""
+        mock_dependencies["list_rows_use_case"].execute.return_value = ([], 0)
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        await mock_mcp.tools["list_table_rows"](
+            vault_slug="my-vault",
+            table_slug="items",
+            search_query="widget",
+        )
+
+        # Verify search was passed
+        call_args = mock_dependencies["list_rows_use_case"].execute.call_args
+        assert call_args[1]["search_query"] == "widget"
+
+
+@pytest.mark.asyncio
+class TestGetTableRowTool:
+    """Tests for get_table_row MCP tool."""
+
+    async def test_get_row_returns_data(self, mock_mcp, mock_dependencies, vault_id):
+        """Test getting a specific row."""
+        table_id = uuid4()
+        row_id = uuid4()
+        now = datetime.now()
+
+        mock_dependencies["get_row_use_case"].execute.return_value = RowDTO(
+            id=row_id,
+            table_id=table_id,
+            data={"name": "Widget", "price": 29.99, "active": True},
+            created_at=now,
+            updated_at=now,
+        )
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["get_table_row"](
+            vault_slug="my-vault",
+            table_slug="products",
+            row_id=str(row_id),
+        )
+
+        assert result["id"] == str(row_id)
+        assert result["table_id"] == str(table_id)
+        assert result["data"]["name"] == "Widget"
+        assert result["data"]["price"] == 29.99
+        assert result["data"]["active"] is True
+
+
+@pytest.mark.asyncio
+class TestQueryTableTool:
+    """Tests for query_table MCP tool."""
+
+    async def test_query_returns_results(self, mock_mcp, mock_dependencies, vault_id):
+        """Test executing a query returns results."""
+        mock_dependencies["execute_query_use_case"].execute.return_value = {
+            "columns": ["name", "email"],
+            "rows": [
+                {"id": str(uuid4()), "name": "John", "email": "john@test.com"},
+                {"id": str(uuid4()), "name": "Jane", "email": "jane@test.com"},
+            ],
+            "total": 2,
+            "limit": 100,
+            "offset": 0,
+        }
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["query_table"](
+            vault_slug="my-vault",
+            query="TABLE name, email FROM contacts",
+        )
+
+        assert "columns" in result
+        assert result["columns"] == ["name", "email"]
+        assert "rows" in result
+        assert len(result["rows"]) == 2
+        assert result["rows"][0]["name"] == "John"
+        assert result["total"] == 2
+
+    async def test_query_with_filter(self, mock_mcp, mock_dependencies, vault_id):
+        """Test executing a query with WHERE clause."""
+        mock_dependencies["execute_query_use_case"].execute.return_value = {
+            "columns": ["name", "status"],
+            "rows": [
+                {"id": str(uuid4()), "name": "Active Item", "status": "active"},
+            ],
+            "total": 1,
+            "limit": 100,
+            "offset": 0,
+        }
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["query_table"](
+            vault_slug="my-vault",
+            query="TABLE name, status FROM items WHERE status = 'active'",
+        )
+
+        # Verify query was passed correctly
+        call_args = mock_dependencies["execute_query_use_case"].execute.call_args
+        assert "WHERE status = 'active'" in call_args[0][2]
+
+        assert len(result["rows"]) == 1
+        assert result["rows"][0]["status"] == "active"
+
+    async def test_query_with_sort_and_limit(self, mock_mcp, mock_dependencies, vault_id):
+        """Test executing a query with SORT and LIMIT."""
+        mock_dependencies["execute_query_use_case"].execute.return_value = {
+            "columns": ["name", "price"],
+            "rows": [
+                {"id": str(uuid4()), "name": "Expensive", "price": 999},
+            ],
+            "total": 100,
+            "limit": 1,
+            "offset": 0,
+        }
+
+        register_mcp_tools(mock_mcp, mock_dependencies)
+        result = await mock_mcp.tools["query_table"](
+            vault_slug="my-vault",
+            query="TABLE * FROM products SORT price DESC LIMIT 1",
+        )
+
+        assert len(result["rows"]) == 1
+        assert result["limit"] == 1

@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, documents, graph, search, vaults
+from app.api.routes import auth, documents, graph, search, tables, vaults
 from app.config import get_settings
 from app.infrastructure.database.connection import init_db, close_db
 
@@ -54,6 +54,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(vaults.router, prefix="/vaults", tags=["Vaults"])
 app.include_router(documents.router, tags=["Documents"])
+app.include_router(tables.router, tags=["Tables"])
 app.include_router(search.router, tags=["Search"])
 app.include_router(graph.router, tags=["Graph"])
 

@@ -34,6 +34,10 @@ def mock_repositories() -> dict[str, AsyncMock]:
         "tag_repo": AsyncMock(),
         "embedding_repo": AsyncMock(),
         "user_repo": AsyncMock(),
+        "table_repo": AsyncMock(),
+        "row_repo": AsyncMock(),
+        "relationship_repo": AsyncMock(),
+        "document_table_link_repo": AsyncMock(),
     }
 
 

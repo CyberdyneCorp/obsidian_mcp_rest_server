@@ -1,10 +1,21 @@
 """MarkdownProcessor service for parsing Markdown documents."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.domain.value_objects.frontmatter import Frontmatter
-from app.domain.value_objects.wiki_link import WikiLink
+from app.domain.value_objects.wiki_link import WikiLink, WikiLinkType
+
+
+@dataclass
+class TableLinkInfo:
+    """Information about a table link in a document."""
+
+    table_name: str
+    row_id: str | None  # None for table links, UUID string for row links
+    link_text: str
+    position: int
+    is_row_link: bool
 
 
 @dataclass
@@ -16,6 +27,7 @@ class ParsedDocument:
     links: list[WikiLink]
     tags: list[str]
     word_count: int
+    table_links: list[TableLinkInfo] = field(default_factory=list)
 
 
 class MarkdownProcessor:
@@ -167,6 +179,43 @@ class MarkdownProcessor:
         words = text.split()
         return len(words)
 
+    def extract_table_links(self, content: str) -> list[TableLinkInfo]:
+        """Extract table and row links from content.
+
+        Args:
+            content: Markdown content
+
+        Returns:
+            List of TableLinkInfo objects
+        """
+        table_links = []
+
+        for match in self._WIKILINK_PATTERN.finditer(content):
+            full_match = match.group(0)
+            position = match.start()
+            try:
+                wiki_link = WikiLink.parse(full_match)
+                if wiki_link.link_type == WikiLinkType.TABLE:
+                    table_links.append(TableLinkInfo(
+                        table_name=wiki_link.table_name or "",
+                        row_id=None,
+                        link_text=full_match,
+                        position=position,
+                        is_row_link=False,
+                    ))
+                elif wiki_link.link_type == WikiLinkType.TABLE_ROW:
+                    table_links.append(TableLinkInfo(
+                        table_name=wiki_link.table_name or "",
+                        row_id=wiki_link.row_id,
+                        link_text=full_match,
+                        position=position,
+                        is_row_link=True,
+                    ))
+            except Exception:
+                continue
+
+        return table_links
+
     def parse(self, content: str) -> ParsedDocument:
         """Parse a complete Markdown document.
 
@@ -179,6 +228,7 @@ class MarkdownProcessor:
         frontmatter, body = self.extract_frontmatter(content)
         links = self.extract_links(body)
         inline_tags = self.extract_tags(body)
+        table_links = self.extract_table_links(body)
 
         # Merge frontmatter tags with inline tags
         all_tags = list(frontmatter.tags) + inline_tags
@@ -192,6 +242,7 @@ class MarkdownProcessor:
             links=links,
             tags=unique_tags,
             word_count=word_count,
+            table_links=table_links,
         )
 
     def render_with_frontmatter(

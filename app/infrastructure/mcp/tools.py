@@ -12,6 +12,12 @@ from app.application.use_cases.link import GetBacklinksUseCase
 from app.application.use_cases.search import SemanticSearchUseCase, FulltextSearchUseCase
 from app.application.use_cases.vault import ListVaultsUseCase
 from app.application.use_cases.graph import GetConnectionsUseCase
+from app.application.use_cases.table import (
+    ListTablesUseCase,
+    GetTableUseCase,
+    ExecuteQueryUseCase,
+)
+from app.application.use_cases.row import ListRowsUseCase, GetRowUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +247,185 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
             "limit": limit,
             "offset": offset,
         }
+
+    # Structured Data Tools
+
+    @mcp.tool()
+    async def list_tables(
+        vault_slug: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict:
+        """List all tables in a vault.
+
+        Args:
+            vault_slug: The vault slug
+            limit: Maximum number of tables to return (default: 100)
+            offset: Pagination offset
+
+        Returns:
+            Object with tables list and total count
+        """
+        use_case: ListTablesUseCase = dependencies["list_tables_use_case"]
+        user_id: UUID = dependencies["current_user_id"]
+
+        tables, total = await use_case.execute(user_id, vault_slug, limit=limit, offset=offset)
+        return {
+            "tables": [
+                {
+                    "id": str(t.id),
+                    "name": t.name,
+                    "slug": t.slug,
+                    "description": t.description,
+                    "column_count": t.column_count,
+                    "row_count": t.row_count,
+                }
+                for t in tables
+            ],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    @mcp.tool()
+    async def get_table(
+        vault_slug: str,
+        table_slug: str,
+    ) -> dict:
+        """Get a table's schema and details.
+
+        Args:
+            vault_slug: The vault slug
+            table_slug: The table slug
+
+        Returns:
+            Table object with id, name, slug, columns, and row_count
+        """
+        use_case: GetTableUseCase = dependencies["get_table_use_case"]
+        user_id: UUID = dependencies["current_user_id"]
+
+        table = await use_case.execute(user_id, vault_slug, table_slug)
+        return {
+            "id": str(table.id),
+            "name": table.name,
+            "slug": table.slug,
+            "description": table.description,
+            "columns": [
+                {
+                    "name": c.name,
+                    "type": c.type,
+                    "required": c.required,
+                    "unique": c.unique,
+                    "default": c.default,
+                    "description": c.description,
+                }
+                for c in table.columns
+            ],
+            "row_count": table.row_count,
+        }
+
+    @mcp.tool()
+    async def list_table_rows(
+        vault_slug: str,
+        table_slug: str,
+        limit: int = 100,
+        offset: int = 0,
+        filters: dict | None = None,
+        sort_column: str | None = None,
+        sort_order: str = "asc",
+        search_query: str | None = None,
+    ) -> dict:
+        """List rows in a table with optional filtering, sorting, and search.
+
+        Args:
+            vault_slug: The vault slug
+            table_slug: The table slug
+            limit: Maximum number of rows to return (default: 100)
+            offset: Pagination offset
+            filters: Column filters, e.g., {"status": "active", "age": {"gt": 18}}
+            sort_column: Column to sort by
+            sort_order: Sort order ('asc' or 'desc')
+            search_query: Full-text search query
+
+        Returns:
+            Object with rows list and total count
+        """
+        use_case: ListRowsUseCase = dependencies["list_rows_use_case"]
+        user_id: UUID = dependencies["current_user_id"]
+
+        rows, total = await use_case.execute(
+            user_id,
+            vault_slug,
+            table_slug,
+            limit=limit,
+            offset=offset,
+            filters=filters,
+            sort_column=sort_column,
+            sort_order=sort_order,
+            search_query=search_query,
+        )
+        return {
+            "rows": [
+                {
+                    "id": str(r.id),
+                    "data": r.data,
+                    "created_at": r.created_at.isoformat(),
+                    "updated_at": r.updated_at.isoformat(),
+                }
+                for r in rows
+            ],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    @mcp.tool()
+    async def get_table_row(
+        vault_slug: str,
+        table_slug: str,
+        row_id: str,
+    ) -> dict:
+        """Get a specific row from a table.
+
+        Args:
+            vault_slug: The vault slug
+            table_slug: The table slug
+            row_id: The row UUID
+
+        Returns:
+            Row object with id, data, created_at, and updated_at
+        """
+        use_case: GetRowUseCase = dependencies["get_row_use_case"]
+        user_id: UUID = dependencies["current_user_id"]
+
+        row = await use_case.execute(user_id, vault_slug, table_slug, UUID(row_id))
+        return {
+            "id": str(row.id),
+            "table_id": str(row.table_id),
+            "data": row.data,
+            "created_at": row.created_at.isoformat(),
+            "updated_at": row.updated_at.isoformat(),
+        }
+
+    @mcp.tool()
+    async def query_table(
+        vault_slug: str,
+        query: str,
+    ) -> dict:
+        """Execute a dataview-style query on tables.
+
+        Args:
+            vault_slug: The vault slug
+            query: Dataview-style query, e.g.:
+                   - "TABLE * FROM contacts"
+                   - "TABLE name, email FROM contacts WHERE status = 'active'"
+                   - "TABLE * FROM orders SORT total DESC LIMIT 10"
+
+        Returns:
+            Query results with columns, rows, and total count
+        """
+        use_case: ExecuteQueryUseCase = dependencies["execute_query_use_case"]
+        user_id: UUID = dependencies["current_user_id"]
+
+        result = await use_case.execute(user_id, vault_slug, query)
+        return result

@@ -452,6 +452,323 @@ class TestDocumentLink:
         assert block_link.link_type == "block"
 
 
+class TestDataTable:
+    """Tests for DataTable entity."""
+
+    def test_create_data_table(self):
+        """Test creating a data table."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import (
+            ColumnType,
+            ColumnDefinition,
+            TableSchema,
+        )
+
+        vault_id = uuid4()
+        schema = TableSchema(columns=[
+            ColumnDefinition(name="name", type=ColumnType.TEXT, required=True),
+            ColumnDefinition(name="email", type=ColumnType.TEXT),
+        ])
+
+        table = DataTable(
+            vault_id=vault_id,
+            name="Contacts",
+            slug="contacts",
+            schema=schema,
+        )
+
+        assert table.vault_id == vault_id
+        assert table.name == "Contacts"
+        assert table.slug == "contacts"
+        assert len(table.schema.columns) == 2
+        assert table.row_count == 0
+        assert table.id is not None
+
+    def test_data_table_with_description(self):
+        """Test creating a table with description."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import TableSchema
+
+        table = DataTable(
+            vault_id=uuid4(),
+            name="Contacts",
+            slug="contacts",
+            schema=TableSchema(columns=[]),
+            description="A table of contacts",
+        )
+
+        assert table.description == "A table of contacts"
+
+    def test_data_table_column_names(self):
+        """Test getting column names from table."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import (
+            ColumnType,
+            ColumnDefinition,
+            TableSchema,
+        )
+
+        schema = TableSchema(columns=[
+            ColumnDefinition(name="id", type=ColumnType.TEXT),
+            ColumnDefinition(name="name", type=ColumnType.TEXT),
+            ColumnDefinition(name="value", type=ColumnType.NUMBER),
+        ])
+
+        table = DataTable(
+            vault_id=uuid4(),
+            name="Items",
+            slug="items",
+            schema=schema,
+        )
+
+        assert table.column_names == ["id", "name", "value"]
+
+    def test_data_table_increment_row_count(self):
+        """Test incrementing row count."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import TableSchema
+
+        table = DataTable(
+            vault_id=uuid4(),
+            name="Items",
+            slug="items",
+            schema=TableSchema(columns=[]),
+        )
+
+        assert table.row_count == 0
+        table.increment_row_count()
+        assert table.row_count == 1
+        table.increment_row_count(5)
+        assert table.row_count == 6
+
+    def test_data_table_decrement_row_count(self):
+        """Test decrementing row count."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import TableSchema
+
+        table = DataTable(
+            vault_id=uuid4(),
+            name="Items",
+            slug="items",
+            schema=TableSchema(columns=[]),
+            row_count=10,
+        )
+
+        table.decrement_row_count()
+        assert table.row_count == 9
+        table.decrement_row_count(5)
+        assert table.row_count == 4
+
+    def test_data_table_decrement_row_count_floor(self):
+        """Test row count cannot go below zero."""
+        from app.domain.entities.data_table import DataTable
+        from app.domain.value_objects.column_type import TableSchema
+
+        table = DataTable(
+            vault_id=uuid4(),
+            name="Items",
+            slug="items",
+            schema=TableSchema(columns=[]),
+            row_count=1,
+        )
+
+        table.decrement_row_count(10)
+        assert table.row_count == 0
+
+
+class TestTableRow:
+    """Tests for TableRow entity."""
+
+    def test_create_table_row(self):
+        """Test creating a table row."""
+        from app.domain.entities.table_row import TableRow
+
+        table_id = uuid4()
+        vault_id = uuid4()
+
+        row = TableRow(
+            table_id=table_id,
+            vault_id=vault_id,
+            data={"name": "John", "email": "john@example.com"},
+        )
+
+        assert row.table_id == table_id
+        assert row.vault_id == vault_id
+        assert row.data["name"] == "John"
+        assert row.data["email"] == "john@example.com"
+        assert row.id is not None
+        assert row.created_at is not None
+
+    def test_table_row_patch_data(self):
+        """Test partial update of row data."""
+        from app.domain.entities.table_row import TableRow
+
+        row = TableRow(
+            table_id=uuid4(),
+            vault_id=uuid4(),
+            data={"name": "John", "status": "active"},
+        )
+
+        row.patch_data({"name": "Jane"})
+
+        assert row.data["name"] == "Jane"
+        assert row.data["status"] == "active"  # Unchanged
+        assert row.updated_at is not None
+
+    def test_table_row_get_field(self):
+        """Test getting specific value from row."""
+        from app.domain.entities.table_row import TableRow
+
+        row = TableRow(
+            table_id=uuid4(),
+            vault_id=uuid4(),
+            data={"name": "Test", "count": 42},
+        )
+
+        assert row.get_field("name") == "Test"
+        assert row.get_field("count") == 42
+        assert row.get_field("nonexistent") is None
+        assert row.get_field("nonexistent", "default") == "default"
+
+    def test_table_row_set_field(self):
+        """Test setting specific value in row."""
+        from app.domain.entities.table_row import TableRow
+
+        row = TableRow(
+            table_id=uuid4(),
+            vault_id=uuid4(),
+            data={"name": "Test"},
+        )
+
+        row.set_field("email", "test@example.com")
+        assert row.data["email"] == "test@example.com"
+
+        row.set_field("name", "Updated")
+        assert row.data["name"] == "Updated"
+
+
+class TestTableRelationship:
+    """Tests for TableRelationship entity."""
+
+    def test_create_table_relationship(self):
+        """Test creating a table relationship."""
+        from app.domain.entities.table_relationship import (
+            TableRelationship,
+            OnDeleteAction,
+        )
+
+        vault_id = uuid4()
+        source_table_id = uuid4()
+        target_table_id = uuid4()
+
+        rel = TableRelationship(
+            vault_id=vault_id,
+            source_table_id=source_table_id,
+            source_column="category_id",
+            target_table_id=target_table_id,
+            target_column="id",
+            relationship_name="category",
+            on_delete=OnDeleteAction.CASCADE,
+        )
+
+        assert rel.vault_id == vault_id
+        assert rel.source_table_id == source_table_id
+        assert rel.target_table_id == target_table_id
+        assert rel.source_column == "category_id"
+        assert rel.target_column == "id"
+        assert rel.relationship_name == "category"
+        assert rel.on_delete == OnDeleteAction.CASCADE
+
+    def test_table_relationship_set_null_action(self):
+        """Test relationship with SET_NULL action."""
+        from app.domain.entities.table_relationship import (
+            TableRelationship,
+            OnDeleteAction,
+        )
+
+        rel = TableRelationship(
+            vault_id=uuid4(),
+            source_table_id=uuid4(),
+            source_column="parent_id",
+            target_table_id=uuid4(),
+            relationship_name="parent",
+            on_delete=OnDeleteAction.SET_NULL,
+        )
+
+        assert rel.on_delete == OnDeleteAction.SET_NULL
+
+    def test_table_relationship_restrict_action(self):
+        """Test relationship with RESTRICT action."""
+        from app.domain.entities.table_relationship import (
+            TableRelationship,
+            OnDeleteAction,
+        )
+
+        rel = TableRelationship(
+            vault_id=uuid4(),
+            source_table_id=uuid4(),
+            source_column="owner_id",
+            target_table_id=uuid4(),
+            relationship_name="owner",
+            on_delete=OnDeleteAction.RESTRICT,
+        )
+
+        assert rel.on_delete == OnDeleteAction.RESTRICT
+
+
+class TestDocumentTableLink:
+    """Tests for DocumentTableLink entity."""
+
+    def test_create_table_link(self):
+        """Test creating a document-table link."""
+        from app.domain.entities.document_table_link import (
+            DocumentTableLink,
+            TableLinkType,
+        )
+
+        vault_id = uuid4()
+        document_id = uuid4()
+        table_id = uuid4()
+
+        link = DocumentTableLink(
+            vault_id=vault_id,
+            document_id=document_id,
+            table_id=table_id,
+            link_type=TableLinkType.TABLE,
+            link_text="[[table:Contacts]]",
+        )
+
+        assert link.vault_id == vault_id
+        assert link.document_id == document_id
+        assert link.table_id == table_id
+        assert link.link_type == TableLinkType.TABLE
+        assert link.row_id is None
+
+    def test_create_row_link(self):
+        """Test creating a document-row link."""
+        from app.domain.entities.document_table_link import (
+            DocumentTableLink,
+            TableLinkType,
+        )
+
+        vault_id = uuid4()
+        document_id = uuid4()
+        table_id = uuid4()
+        row_id = uuid4()
+
+        link = DocumentTableLink(
+            vault_id=vault_id,
+            document_id=document_id,
+            table_id=table_id,
+            row_id=row_id,
+            link_type=TableLinkType.TABLE_ROW,
+            link_text="[[row:Contacts/uuid]]",
+        )
+
+        assert link.row_id == row_id
+        assert link.link_type == TableLinkType.TABLE_ROW
+
+
 class TestEmbeddingChunk:
     """Tests for EmbeddingChunk entity."""
 

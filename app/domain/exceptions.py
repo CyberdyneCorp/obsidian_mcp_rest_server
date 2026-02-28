@@ -233,3 +233,136 @@ class GraphServiceError(DomainException):
             f"Graph service error: {error}",
             {"service_error": error},
         )
+
+
+# Table Exceptions
+class TableNotFoundError(DomainException):
+    """Table does not exist."""
+
+    code = "TABLE_NOT_FOUND"
+    http_status = 404
+
+    def __init__(
+        self, table_id: str | None = None, slug: str | None = None
+    ) -> None:
+        details = {}
+        if table_id:
+            details["table_id"] = table_id
+            message = f"Table with ID '{table_id}' not found"
+        elif slug:
+            details["slug"] = slug
+            message = f"Table with slug '{slug}' not found"
+        else:
+            message = "Table not found"
+        super().__init__(message, details)
+
+
+class DuplicateTableError(DomainException):
+    """Table with same slug already exists."""
+
+    code = "DUPLICATE_TABLE"
+    http_status = 409
+
+    def __init__(self, slug: str) -> None:
+        super().__init__(
+            f"Table with slug '{slug}' already exists",
+            {"slug": slug},
+        )
+
+
+class RowNotFoundError(DomainException):
+    """Row does not exist."""
+
+    code = "ROW_NOT_FOUND"
+    http_status = 404
+
+    def __init__(self, row_id: str) -> None:
+        super().__init__(
+            f"Row with ID '{row_id}' not found",
+            {"row_id": row_id},
+        )
+
+
+class SchemaValidationError(DomainException):
+    """Row data does not conform to table schema."""
+
+    code = "SCHEMA_VALIDATION_ERROR"
+    http_status = 400
+
+    def __init__(self, errors: list[str]) -> None:
+        super().__init__(
+            "Row data validation failed",
+            {"validation_errors": errors},
+        )
+
+
+class ReferentialIntegrityError(DomainException):
+    """Foreign key constraint violation."""
+
+    code = "REFERENTIAL_INTEGRITY_ERROR"
+    http_status = 400
+
+    def __init__(
+        self,
+        message: str,
+        source_table: str | None = None,
+        target_table: str | None = None,
+    ) -> None:
+        details: dict[str, Any] = {}
+        if source_table:
+            details["source_table"] = source_table
+        if target_table:
+            details["target_table"] = target_table
+        super().__init__(message, details)
+
+
+class RelationshipNotFoundError(DomainException):
+    """Relationship does not exist."""
+
+    code = "RELATIONSHIP_NOT_FOUND"
+    http_status = 404
+
+    def __init__(self, relationship_id: str) -> None:
+        super().__init__(
+            f"Relationship with ID '{relationship_id}' not found",
+            {"relationship_id": relationship_id},
+        )
+
+
+class DuplicateRelationshipError(DomainException):
+    """Relationship already exists."""
+
+    code = "DUPLICATE_RELATIONSHIP"
+    http_status = 409
+
+    def __init__(self, source_table: str, source_column: str) -> None:
+        super().__init__(
+            f"Relationship for column '{source_column}' in table '{source_table}' already exists",
+            {"source_table": source_table, "source_column": source_column},
+        )
+
+
+class QueryParseError(DomainException):
+    """Query syntax is invalid."""
+
+    code = "QUERY_PARSE_ERROR"
+    http_status = 400
+
+    def __init__(self, query: str, error: str) -> None:
+        super().__init__(
+            f"Failed to parse query: {error}",
+            {"query": query, "parse_error": error},
+        )
+
+
+class CsvParseError(DomainException):
+    """CSV parsing failed."""
+
+    code = "CSV_PARSE_ERROR"
+    http_status = 400
+
+    def __init__(self, error: str, line: int | None = None) -> None:
+        details: dict[str, Any] = {"parse_error": error}
+        if line is not None:
+            details["line"] = line
+        super().__init__(f"CSV parsing failed: {error}", details)
