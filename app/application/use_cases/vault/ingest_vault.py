@@ -22,7 +22,7 @@ from app.domain.entities.embedding_chunk import EmbeddingChunk
 from app.domain.entities.folder import Folder
 from app.domain.entities.tag import Tag
 from app.domain.entities.vault import Vault
-from app.domain.exceptions import DuplicateVaultError
+from app.domain.exceptions import DuplicateVaultError, InvalidDocumentPathError
 from app.domain.services.link_resolver import LinkResolver
 from app.domain.services.markdown_processor import MarkdownProcessor
 from app.domain.services.tag_parser import TagParser
@@ -138,7 +138,11 @@ class IngestVaultUseCase:
                 if any(part.startswith(".") or part.startswith("__") for part in path.split("/")):
                     continue
 
-                doc_path = DocumentPath(path)
+                try:
+                    doc_path = DocumentPath(path)
+                except ValueError as exc:
+                    logger.warning(f"Skipping invalid path in ZIP: {path!r} ({exc})")
+                    raise InvalidDocumentPathError(path, str(exc)) from exc
 
                 # Only process markdown files
                 if not doc_path.is_markdown:

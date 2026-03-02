@@ -105,6 +105,10 @@ Create a `.env` file:
 DATABASE_URL=postgresql+asyncpg://obsidian:obsidian@localhost:5433/obsidian
 OPENAI_API_KEY=your-openai-api-key
 JWT_SECRET=your-secret-key-min-32-chars
+JWT_ISSUER=obsidian-vault-server
+MAX_UPLOAD_SIZE_MB=100
+ENVIRONMENT=development
+RATE_LIMIT_ENABLED=true
 ```
 
 ### 4. Run Migrations

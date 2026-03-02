@@ -1,9 +1,10 @@
 """Application configuration using pydantic-settings."""
 
 from functools import lru_cache
+import os
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +42,10 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(
         default="change-me-in-production",
         description="Secret key for JWT signing",
+    )
+    jwt_issuer: str = Field(
+        default="obsidian-vault-server",
+        description="Expected JWT issuer claim",
     )
     jwt_algorithm: str = Field(
         default="HS256",
@@ -86,11 +91,32 @@ class Settings(BaseSettings):
         default=50,
         description="Token overlap between chunks",
     )
+    max_upload_size_mb: int = Field(
+        default=100,
+        ge=1,
+        description="Maximum upload size in MB",
+    )
+
+    @model_validator(mode="after")
+    def validate_security_settings(self) -> "Settings":
+        """Validate security settings when running in production."""
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+        if environment == "production":
+            if self.jwt_secret == "change-me-in-production":
+                raise ValueError("JWT_SECRET must be configured in production")
+            if len(self.jwt_secret) < 32:
+                raise ValueError("JWT_SECRET must be at least 32 characters in production")
+        return self
 
     @property
     def sync_database_url(self) -> str:
         """Get synchronous database URL for Alembic."""
         return self.database_url.replace("+asyncpg", "")
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        """Maximum upload size in bytes."""
+        return self.max_upload_size_mb * 1024 * 1024
 
 
 @lru_cache

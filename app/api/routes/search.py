@@ -1,6 +1,8 @@
 """Search routes."""
 
-from fastapi import APIRouter, HTTPException, Query, status
+import logging
+
+from fastapi import APIRouter, Query
 
 from app.api.dependencies import (
     CurrentUserDep,
@@ -19,9 +21,9 @@ from app.api.schemas.search import (
 )
 from app.application.dto.search_dto import SearchQueryDTO
 from app.application.use_cases.search import FulltextSearchUseCase, SemanticSearchUseCase
-from app.domain.exceptions import EmbeddingServiceError, VaultNotFoundError
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -38,6 +40,7 @@ async def semantic_search(
     embedding_provider: EmbeddingProviderDep,
 ) -> SemanticSearchResponse:
     """Perform semantic (vector) search."""
+    logger.debug(f"POST /vaults/{slug}/search/semantic query={data.query!r} user={current_user.id}")
     use_case = SemanticSearchUseCase(
         vault_repo=vault_repo,
         document_repo=document_repo,
@@ -45,29 +48,19 @@ async def semantic_search(
         embedding_provider=embedding_provider,
     )
 
-    try:
-        results = await use_case.execute(
-            current_user.id,
-            slug,
-            SearchQueryDTO(
-                query=data.query,
-                limit=data.limit,
-                threshold=data.threshold,
-                folder=data.folder,
-                tags=data.tags or [],
-            ),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except EmbeddingServiceError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        )
+    results = await use_case.execute(
+        current_user.id,
+        slug,
+        SearchQueryDTO(
+            query=data.query,
+            limit=data.limit,
+            threshold=data.threshold,
+            folder=data.folder,
+            tags=data.tags or [],
+        ),
+    )
 
+    logger.debug(f"Semantic search returned {len(results)} results")
     return SemanticSearchResponse(
         results=[
             SearchResultResponse(
@@ -97,30 +90,26 @@ async def semantic_search(
 )
 async def fulltext_search(
     slug: str,
+    current_user: CurrentUserDep,
+    vault_repo: VaultRepoDep,
+    document_repo: DocumentRepoDep,
     q: str = Query(..., min_length=1, max_length=1000),
     limit: int = Query(default=20, ge=1, le=100),
     folder: str | None = None,
-    current_user: CurrentUserDep = None,
-    vault_repo: VaultRepoDep = None,
-    document_repo: DocumentRepoDep = None,
 ) -> FulltextSearchResponse:
     """Perform full-text search."""
+    logger.debug(f"GET /vaults/{slug}/search/fulltext q={q!r} user={current_user.id}")
     use_case = FulltextSearchUseCase(vault_repo, document_repo)
 
-    try:
-        results = await use_case.execute(
-            current_user.id,
-            slug,
-            q,
-            limit,
-            folder,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    results = await use_case.execute(
+        current_user.id,
+        slug,
+        q,
+        limit,
+        folder,
+    )
 
+    logger.debug(f"Fulltext search returned {len(results)} results")
     return FulltextSearchResponse(
         results=[
             FulltextSearchResult(

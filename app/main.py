@@ -7,6 +7,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.exception_handlers import register_exception_handlers
+from app.api.rate_limit import RateLimitMiddleware
 from app.api.routes import auth, documents, graph, search, tables, vaults
 from app.config import get_settings
 from app.infrastructure.database.connection import init_db, close_db
@@ -49,6 +51,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if settings.rate_limit_enabled:
+    app.add_middleware(RateLimitMiddleware)
+
+# Register exception handlers
+register_exception_handlers(app)
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])

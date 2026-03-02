@@ -1,5 +1,6 @@
 """Create document use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentCreateDTO, DocumentDTO
@@ -8,14 +9,15 @@ from app.application.interfaces.repositories import (
     FolderRepository,
     VaultRepository,
 )
+from app.application.use_cases.base import VaultAccessMixin
 from app.domain.entities.document import Document
-from app.domain.exceptions import DuplicateDocumentError, VaultNotFoundError
+from app.domain.exceptions import DuplicateDocumentError, InvalidDocumentPathError
 from app.domain.services.markdown_processor import MarkdownProcessor
 from app.domain.value_objects.document_path import DocumentPath
 from app.domain.value_objects.frontmatter import Frontmatter
 
 
-class CreateDocumentUseCase:
+class CreateDocumentUseCase(VaultAccessMixin):
     """Use case for creating a new document."""
 
     def __init__(
@@ -28,6 +30,7 @@ class CreateDocumentUseCase:
         self.document_repo = document_repo
         self.folder_repo = folder_repo
         self.markdown_processor = MarkdownProcessor()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -49,10 +52,7 @@ class CreateDocumentUseCase:
             VaultNotFoundError: If vault not found
             DuplicateDocumentError: If document path already exists
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Check for duplicate
         existing = await self.document_repo.get_by_path(vault.id, data.path)
@@ -69,7 +69,10 @@ class CreateDocumentUseCase:
             frontmatter = frontmatter.merge(provided_fm)
 
         # Get or create folder
-        doc_path = DocumentPath(data.path)
+        try:
+            doc_path = DocumentPath(data.path)
+        except ValueError as exc:
+            raise InvalidDocumentPathError(data.path, str(exc)) from exc
         folder_id = None
         if doc_path.folder_path:
             folder = await self.folder_repo.get_or_create_path(
@@ -93,5 +96,6 @@ class CreateDocumentUseCase:
         # Update vault document count
         vault.increment_document_count()
         await self.vault_repo.update(vault)
+        self._logger.info(f"Created document path={data.path} in vault={vault_slug}")
 
         return DocumentDTO.from_entity(document)

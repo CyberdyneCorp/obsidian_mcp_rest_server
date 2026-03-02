@@ -28,12 +28,24 @@ class DocumentPath:
     @staticmethod
     def _normalize(path: str) -> str:
         """Normalize the path."""
+        original = path
+
         # Remove leading/trailing slashes and whitespace
         path = path.strip().strip("/")
 
         # Collapse multiple slashes
         while "//" in path:
             path = path.replace("//", "/")
+
+        if not path:
+            raise ValueError("Document path cannot be empty")
+
+        if "\\" in original:
+            raise ValueError("Document path cannot contain backslashes")
+
+        parts = path.split("/")
+        if any(part in {".", ".."} for part in parts):
+            raise ValueError("Document path cannot contain traversal segments")
 
         return path
 

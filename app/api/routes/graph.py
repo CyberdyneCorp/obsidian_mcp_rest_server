@@ -1,8 +1,9 @@
 """Graph routes."""
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query
 
 from app.api.dependencies import (
     CurrentUserDep,
@@ -18,9 +19,10 @@ from app.api.schemas.graph import (
     PathResponse,
 )
 from app.application.use_cases.graph import GetConnectionsUseCase
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.domain.exceptions import DomainException, VaultNotFoundError
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -30,32 +32,22 @@ router = APIRouter()
 async def get_connections(
     slug: str,
     document_id: UUID,
+    current_user: CurrentUserDep,
+    vault_repo: VaultRepoDep,
+    document_repo: DocumentRepoDep,
+    graph_provider: GraphProviderDep,
     depth: int = Query(default=2, ge=1, le=5),
-    current_user: CurrentUserDep = None,
-    vault_repo: VaultRepoDep = None,
-    document_repo: DocumentRepoDep = None,
-    graph_provider: GraphProviderDep = None,
 ) -> GraphResponse:
     """Get connected documents within N hops."""
+    logger.debug(f"GET /vaults/{slug}/graph/connections/{document_id} depth={depth} user={current_user.id}")
     use_case = GetConnectionsUseCase(vault_repo, document_repo, graph_provider)
 
-    try:
-        result = await use_case.execute(
-            current_user.id,
-            slug,
-            document_id,
-            depth,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    result = await use_case.execute(
+        current_user.id,
+        slug,
+        document_id,
+        depth,
+    )
 
     return GraphResponse(
         center=DocumentSummaryResponse(
@@ -96,32 +88,28 @@ async def get_shortest_path(
     slug: str,
     source: UUID,
     target: UUID,
-    current_user: CurrentUserDep = None,
-    vault_repo: VaultRepoDep = None,
-    document_repo: DocumentRepoDep = None,
-    graph_provider: GraphProviderDep = None,
+    current_user: CurrentUserDep,
+    vault_repo: VaultRepoDep,
+    document_repo: DocumentRepoDep,
+    graph_provider: GraphProviderDep,
 ) -> PathResponse:
     """Get shortest path between two documents."""
+    logger.debug(f"GET /vaults/{slug}/graph/path source={source} target={target} user={current_user.id}")
     use_case = GetConnectionsUseCase(vault_repo, document_repo, graph_provider)
 
-    try:
-        path = await use_case.get_shortest_path(
-            current_user.id,
-            slug,
-            source,
-            target,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    path = await use_case.get_shortest_path(
+        current_user.id,
+        slug,
+        source,
+        target,
+    )
 
     if path is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No path found between documents",
-        )
+        class NoPathFoundError(DomainException):
+            code = "NO_PATH_FOUND"
+            http_status = 404
+
+        raise NoPathFoundError("No path found between documents")
 
     return PathResponse(
         path=[
@@ -144,44 +132,28 @@ async def get_orphans(
     graph_provider: GraphProviderDep,
 ) -> dict:
     """Get documents with no connections."""
+    logger.debug(f"GET /vaults/{slug}/graph/orphans user={current_user.id}")
     vault = await vault_repo.get_by_slug(current_user.id, slug)
     if not vault:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Vault '{slug}' not found",
-        )
+        raise VaultNotFoundError(slug=slug)
 
-    try:
-        orphans = await graph_provider.get_orphans(vault.id)
-        return {"orphans": orphans}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Graph query failed: {str(e)}",
-        )
+    orphans = await graph_provider.get_orphans(vault.id)
+    return {"orphans": orphans}
 
 
 @router.get("/vaults/{slug}/graph/hubs")
 async def get_hubs(
     slug: str,
+    current_user: CurrentUserDep,
+    vault_repo: VaultRepoDep,
+    graph_provider: GraphProviderDep,
     limit: int = Query(default=10, ge=1, le=50),
-    current_user: CurrentUserDep = None,
-    vault_repo: VaultRepoDep = None,
-    graph_provider: GraphProviderDep = None,
 ) -> dict:
     """Get most connected documents."""
+    logger.debug(f"GET /vaults/{slug}/graph/hubs limit={limit} user={current_user.id}")
     vault = await vault_repo.get_by_slug(current_user.id, slug)
     if not vault:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Vault '{slug}' not found",
-        )
+        raise VaultNotFoundError(slug=slug)
 
-    try:
-        hubs = await graph_provider.get_hubs(vault.id, limit)
-        return {"hubs": hubs}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Graph query failed: {str(e)}",
-        )
+    hubs = await graph_provider.get_hubs(vault.id, limit)
+    return {"hubs": hubs}

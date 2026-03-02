@@ -1,8 +1,10 @@
 """Vault routes."""
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.responses import StreamingResponse
 import io
+import logging
+
+from fastapi import APIRouter, File, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import (
     CurrentUserDep,
@@ -20,7 +22,6 @@ from app.api.schemas.vault import (
     VaultCreate,
     VaultListResponse,
     VaultResponse,
-    VaultUpdate,
 )
 from app.application.dto.vault_dto import VaultCreateDTO
 from app.application.use_cases.vault import (
@@ -31,9 +32,11 @@ from app.application.use_cases.vault import (
     IngestVaultUseCase,
     ListVaultsUseCase,
 )
-from app.domain.exceptions import DuplicateVaultError, VaultNotFoundError
+from app.config import get_settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 @router.get("", response_model=VaultListResponse)
@@ -42,6 +45,7 @@ async def list_vaults(
     vault_repo: VaultRepoDep,
 ) -> VaultListResponse:
     """List all vaults for the current user."""
+    logger.debug(f"GET /vaults user={current_user.id}")
     use_case = ListVaultsUseCase(vault_repo)
     vaults = await use_case.execute(current_user.id)
 
@@ -68,18 +72,13 @@ async def create_vault(
     vault_repo: VaultRepoDep,
 ) -> VaultResponse:
     """Create a new vault."""
+    logger.info(f"POST /vaults name={data.name} user={current_user.id}")
     use_case = CreateVaultUseCase(vault_repo)
 
-    try:
-        vault = await use_case.execute(
-            current_user.id,
-            VaultCreateDTO(name=data.name, description=data.description),
-        )
-    except DuplicateVaultError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    vault = await use_case.execute(
+        current_user.id,
+        VaultCreateDTO(name=data.name, description=data.description),
+    )
 
     return VaultResponse(
         id=vault.id,
@@ -99,15 +98,10 @@ async def get_vault(
     vault_repo: VaultRepoDep,
 ) -> VaultResponse:
     """Get vault by slug."""
+    logger.debug(f"GET /vaults/{slug} user={current_user.id}")
     use_case = GetVaultUseCase(vault_repo)
 
-    try:
-        vault = await use_case.execute(current_user.id, slug)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    vault = await use_case.execute(current_user.id, slug)
 
     return VaultResponse(
         id=vault.id,
@@ -128,44 +122,54 @@ async def delete_vault(
     storage_provider: StorageProviderDep,
 ) -> None:
     """Delete vault and all its contents."""
+    logger.info(f"DELETE /vaults/{slug} user={current_user.id}")
     use_case = DeleteVaultUseCase(vault_repo, storage_provider=storage_provider)
 
-    try:
-        await use_case.execute(current_user.id, slug)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    await use_case.execute(current_user.id, slug)
 
 
 @router.post("/{slug}/ingest", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_vault(
     slug: str,
+    current_user: CurrentUserDep,
+    vault_repo: VaultRepoDep,
+    document_repo: DocumentRepoDep,
+    folder_repo: FolderRepoDep,
+    link_repo: LinkRepoDep,
+    tag_repo: TagRepoDep,
+    embedding_repo: EmbeddingRepoDep,
+    embedding_provider: EmbeddingProviderDep,
+    graph_provider: GraphProviderDep,
     file: UploadFile = File(...),
     generate_embeddings: bool = True,
-    current_user: CurrentUserDep = None,
-    vault_repo: VaultRepoDep = None,
-    document_repo: DocumentRepoDep = None,
-    folder_repo: FolderRepoDep = None,
-    link_repo: LinkRepoDep = None,
-    tag_repo: TagRepoDep = None,
-    embedding_repo: EmbeddingRepoDep = None,
-    embedding_provider: EmbeddingProviderDep = None,
-    graph_provider: GraphProviderDep = None,
 ) -> dict:
     """Upload and ingest a ZIP file into a vault.
 
     If the vault doesn't exist, it will be created.
     """
+    logger.info(f"POST /vaults/{slug}/ingest file={file.filename} user={current_user.id}")
+
     if not file.filename or not file.filename.endswith(".zip"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a ZIP archive",
-        )
+        from app.domain.exceptions import DomainException
+
+        class InvalidFileError(DomainException):
+            code = "INVALID_FILE"
+            http_status = 400
+
+        raise InvalidFileError("File must be a ZIP archive")
 
     # Read file content
     content = await file.read()
+    if len(content) > settings.max_upload_size_bytes:
+        from app.domain.exceptions import DomainException
+
+        class FileTooLargeError(DomainException):
+            code = "FILE_TOO_LARGE"
+            http_status = 413
+
+        raise FileTooLargeError(
+            f"File exceeds maximum size of {settings.max_upload_size_mb}MB"
+        )
 
     use_case = IngestVaultUseCase(
         vault_repo=vault_repo,
@@ -175,27 +179,17 @@ async def ingest_vault(
         tag_repo=tag_repo,
         embedding_repo=embedding_repo if generate_embeddings else None,
         embedding_provider=embedding_provider if generate_embeddings else None,
-        graph_provider=graph_provider,  # AGE graph building enabled
+        graph_provider=graph_provider,
     )
 
-    try:
-        vault = await use_case.execute(
-            user_id=current_user.id,
-            vault_name=slug.replace("-", " ").title(),
-            zip_content=content,
-            generate_embeddings=generate_embeddings,
-        )
-    except DuplicateVaultError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Vault '{slug}' already exists",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ingestion failed: {str(e)}",
-        )
+    vault = await use_case.execute(
+        user_id=current_user.id,
+        vault_name=slug.replace("-", " ").title(),
+        zip_content=content,
+        generate_embeddings=generate_embeddings,
+    )
 
+    logger.info(f"Vault ingestion completed slug={slug} docs={vault.document_count}")
     return {
         "vault_id": str(vault.id),
         "status": "completed",
@@ -213,19 +207,14 @@ async def export_vault(
     folder_repo: FolderRepoDep,
 ) -> StreamingResponse:
     """Export vault as ZIP file."""
+    logger.debug(f"GET /vaults/{slug}/export user={current_user.id}")
     use_case = ExportVaultUseCase(
         vault_repo=vault_repo,
         document_repo=document_repo,
         folder_repo=folder_repo,
     )
 
-    try:
-        zip_content = await use_case.execute(current_user.id, slug)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    zip_content = await use_case.execute(current_user.id, slug)
 
     return StreamingResponse(
         io.BytesIO(zip_content),

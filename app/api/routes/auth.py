@@ -34,6 +34,7 @@ def create_access_token(user_id: str) -> str:
     payload = {
         "sub": user_id,
         "exp": expire,
+        "iss": settings.jwt_issuer,
         "type": "access",
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -45,6 +46,7 @@ def create_refresh_token(user_id: str) -> str:
     payload = {
         "sub": user_id,
         "exp": expire,
+        "iss": settings.jwt_issuer,
         "type": "refresh",
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -141,6 +143,7 @@ async def refresh(
             data.refresh_token,
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
+            issuer=settings.jwt_issuer,
         )
         if payload.get("type") != "refresh":
             raise HTTPException(
@@ -148,6 +151,11 @@ async def refresh(
                 detail="Invalid token type",
             )
         user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

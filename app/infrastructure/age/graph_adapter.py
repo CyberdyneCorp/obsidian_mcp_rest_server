@@ -1,6 +1,7 @@
 """Apache AGE graph adapter."""
 
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -51,18 +52,25 @@ class AgeGraphAdapter:
                     value = self._escape_cypher_string(value)
                 formatted_query = formatted_query.replace(f"${key}", str(value))
 
-        # Execute using raw SQL to bypass SQLAlchemy's parameter parsing
-        # SQLAlchemy interprets :WORD as bind parameters, which breaks Cypher syntax
+        # AGE's cypher() requires string constants, not bind parameters.
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", self.graph_name):
+            raise ValueError("Invalid graph name")
+
+        dollar_tag = "$cypher$"
+        if dollar_tag in formatted_query:
+            dollar_tag = "$cypher_safe$"
+        if dollar_tag in formatted_query:
+            raise ValueError("Cypher query contains an unsupported delimiter token")
+
         sql = f"""
-        SELECT * FROM cypher('{self.graph_name}', $$
+        SELECT *
+        FROM cypher('{self.graph_name}', {dollar_tag}
             {formatted_query}
-        $$) as result(v agtype);
+        {dollar_tag}) AS result(v agtype);
         """
 
         try:
-            # Use get_raw_connection to bypass SQLAlchemy's parameter handling
             raw_conn = await self.session.connection()
-            # Use exec_driver_sql which sends SQL directly without parsing
             result = await raw_conn.exec_driver_sql(sql)
             rows = result.fetchall()
             return [{"v": row[0]} for row in rows]

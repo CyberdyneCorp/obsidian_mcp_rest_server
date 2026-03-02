@@ -93,6 +93,19 @@ class DuplicateDocumentError(DomainException):
         )
 
 
+class InvalidDocumentPathError(DomainException):
+    """Document path is invalid."""
+
+    code = "INVALID_DOCUMENT_PATH"
+    http_status = 400
+
+    def __init__(self, path: str, reason: str) -> None:
+        super().__init__(
+            f"Invalid document path '{path}': {reason}",
+            {"path": path, "reason": reason},
+        )
+
+
 # Folder Exceptions
 class FolderNotFoundError(DomainException):
     """Folder does not exist."""
