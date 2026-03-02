@@ -1,11 +1,17 @@
 """DataTable entity representing a user-defined table."""
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from uuid import UUID, uuid4
 import re
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID, uuid4
 
-from app.domain.value_objects.column_type import TableSchema, ColumnDefinition
+from app.domain.value_objects.column_type import ColumnDefinition, TableSchema
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _generate_slug(name: str) -> str:
@@ -32,8 +38,8 @@ class DataTable:
     description: str | None = None
     schema: TableSchema = field(default_factory=TableSchema)
     row_count: int = 0
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
+    updated_at: datetime = field(default_factory=_utcnow_naive)
 
     def __post_init__(self) -> None:
         """Initialize computed fields."""
@@ -45,7 +51,7 @@ class DataTable:
         cls,
         vault_id: UUID,
         name: str,
-        columns: list[dict] | None = None,
+        columns: list[dict[str, Any]] | None = None,
         description: str | None = None,
         slug: str | None = None,
     ) -> "DataTable":
@@ -112,9 +118,9 @@ class DataTable:
 
     def _touch(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow_naive()
 
-    def validate_row_data(self, data: dict) -> tuple[bool, list[str]]:
+    def validate_row_data(self, data: dict[str, Any]) -> tuple[bool, list[str]]:
         """Validate row data against the table schema.
 
         Returns:

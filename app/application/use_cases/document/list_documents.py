@@ -45,6 +45,7 @@ class ListDocumentsUseCase(VaultAccessMixin):
         Raises:
             VaultNotFoundError: If vault not found
         """
+        _ = tag
         vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get documents

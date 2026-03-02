@@ -1,9 +1,14 @@
 """TableRow entity representing a row of data in a table."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @dataclass
@@ -18,8 +23,8 @@ class TableRow:
     table_id: UUID = field(default_factory=uuid4)
     vault_id: UUID = field(default_factory=uuid4)
     data: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
+    updated_at: datetime = field(default_factory=_utcnow_naive)
 
     @classmethod
     def create(
@@ -72,7 +77,7 @@ class TableRow:
 
     def _touch(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow_naive()
 
     @property
     def field_names(self) -> list[str]:

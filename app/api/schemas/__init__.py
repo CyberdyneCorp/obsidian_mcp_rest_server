@@ -1,40 +1,40 @@
 """API schemas."""
 
 from app.api.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
     UserCreate,
     UserResponse,
-    LoginRequest,
-    TokenResponse,
-    RefreshRequest,
-)
-from app.api.schemas.vault import (
-    VaultCreate,
-    VaultUpdate,
-    VaultResponse,
-    VaultListResponse,
 )
 from app.api.schemas.document import (
     DocumentCreate,
-    DocumentUpdate,
+    DocumentListResponse,
     DocumentResponse,
     DocumentSummaryResponse,
-    DocumentListResponse,
-)
-from app.api.schemas.search import (
-    SemanticSearchRequest,
-    SearchResultResponse,
-    FulltextSearchResponse,
-)
-from app.api.schemas.link import (
-    LinkResponse,
-    LinksResponse,
-    BacklinkResponse,
-    BacklinksResponse,
+    DocumentUpdate,
 )
 from app.api.schemas.graph import (
     ConnectionResponse,
     GraphResponse,
     PathResponse,
+)
+from app.api.schemas.link import (
+    BacklinkResponse,
+    BacklinksResponse,
+    LinkResponse,
+    LinksResponse,
+)
+from app.api.schemas.search import (
+    FulltextSearchResponse,
+    SearchResultResponse,
+    SemanticSearchRequest,
+)
+from app.api.schemas.vault import (
+    VaultCreate,
+    VaultListResponse,
+    VaultResponse,
+    VaultUpdate,
 )
 
 __all__ = [

@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.entities.table_relationship import TableRelationship, OnDeleteAction
+from app.domain.entities.table_relationship import OnDeleteAction, TableRelationship
 from app.infrastructure.database.models.table_relationship import TableRelationshipModel
 from app.infrastructure.database.repositories.base import BaseRepository
 

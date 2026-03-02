@@ -8,16 +8,16 @@ from fastmcp import FastMCP
 
 from app.application.dto.search_dto import SearchQueryDTO
 from app.application.use_cases.document import GetDocumentUseCase, ListDocumentsUseCase
-from app.application.use_cases.link import GetBacklinksUseCase
-from app.application.use_cases.search import SemanticSearchUseCase, FulltextSearchUseCase
-from app.application.use_cases.vault import ListVaultsUseCase
 from app.application.use_cases.graph import GetConnectionsUseCase
+from app.application.use_cases.link import GetBacklinksUseCase
+from app.application.use_cases.row import GetRowUseCase, ListRowsUseCase
+from app.application.use_cases.search import FulltextSearchUseCase, SemanticSearchUseCase
 from app.application.use_cases.table import (
-    ListTablesUseCase,
-    GetTableUseCase,
     ExecuteQueryUseCase,
+    GetTableUseCase,
+    ListTablesUseCase,
 )
-from app.application.use_cases.row import ListRowsUseCase, GetRowUseCase
+from app.application.use_cases.vault import ListVaultsUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
     """
 
     @mcp.tool()
-    async def list_vaults() -> list[dict]:
+    async def list_vaults() -> list[dict[str, Any]]:
         """List all vaults for the authenticated user.
 
         Returns:
@@ -56,7 +56,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         vault_slug: str,
         path: str | None = None,
         document_id: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get a document by path or ID.
 
         Args:
@@ -91,7 +91,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         limit: int = 10,
         folder: str | None = None,
         tags: list[str] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Search documents using semantic or full-text search.
 
         Args:
@@ -115,7 +115,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
                 folder=folder,
                 tags=tags or [],
             )
-            results = await use_case.execute(user_id, vault_slug, search_query)
+            semantic_results = await use_case.execute(user_id, vault_slug, search_query)
             return [
                 {
                     "id": str(r.document.id),
@@ -124,11 +124,11 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
                     "score": r.score,
                     "matched_chunk": r.matched_chunk,
                 }
-                for r in results
+                for r in semantic_results
             ]
         else:
             use_case_ft: FulltextSearchUseCase = dependencies["fulltext_search_use_case"]
-            results = await use_case_ft.execute(user_id, vault_slug, query, limit, folder)
+            fulltext_results = await use_case_ft.execute(user_id, vault_slug, query, limit, folder)
             return [
                 {
                     "id": str(r.document.id),
@@ -136,14 +136,14 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
                     "path": r.document.path,
                     "headline": r.headline,
                 }
-                for r in results
+                for r in fulltext_results
             ]
 
     @mcp.tool()
     async def get_backlinks(
         vault_slug: str,
         document_id: str,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get documents that link to a specific document.
 
         Args:
@@ -175,7 +175,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         vault_slug: str,
         document_id: str,
         depth: int = 2,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get the document graph around a document.
 
         Args:
@@ -214,7 +214,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         limit: int = 50,
         offset: int = 0,
         folder: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """List documents in a vault.
 
         Args:
@@ -255,7 +255,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         vault_slug: str,
         limit: int = 100,
         offset: int = 0,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """List all tables in a vault.
 
         Args:
@@ -291,7 +291,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
     async def get_table(
         vault_slug: str,
         table_slug: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get a table's schema and details.
 
         Args:
@@ -330,11 +330,11 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         table_slug: str,
         limit: int = 100,
         offset: int = 0,
-        filters: dict | None = None,
+        filters: dict[str, Any] | None = None,
         sort_column: str | None = None,
         sort_order: str = "asc",
         search_query: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """List rows in a table with optional filtering, sorting, and search.
 
         Args:
@@ -384,7 +384,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
         vault_slug: str,
         table_slug: str,
         row_id: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get a specific row from a table.
 
         Args:
@@ -411,7 +411,7 @@ def register_mcp_tools(mcp: FastMCP, dependencies: dict[str, Any]) -> None:
     async def query_table(
         vault_slug: str,
         query: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Execute a dataview-style query on tables.
 
         Args:

@@ -87,15 +87,12 @@ class ExecuteQueryUseCase(VaultAccessMixin):
         )
 
         # Determine columns to return
-        if parsed.columns:
-            columns = parsed.columns
-        else:
-            columns = table.column_names
+        columns = parsed.columns or table.column_names
 
         # Build result rows
         result_rows = []
         for row in rows:
-            row_data = {"id": str(row.id)}
+            row_data: dict[str, Any] = {"id": str(row.id)}
             for col in columns:
                 row_data[col] = row.data.get(col)
             result_rows.append(row_data)

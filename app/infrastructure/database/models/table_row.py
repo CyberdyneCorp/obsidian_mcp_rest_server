@@ -1,6 +1,7 @@
 """TableRow SQLAlchemy model."""
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey
@@ -8,6 +9,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.connection import Base
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class TableRowModel(Base):
@@ -22,10 +28,10 @@ class TableRowModel(Base):
     vault_id: Mapped[UUID] = mapped_column(
         ForeignKey("vaults.id", ondelete="CASCADE"), nullable=False
     )
-    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utcnow_naive, onupdate=_utcnow_naive
     )
 
     # Relationships

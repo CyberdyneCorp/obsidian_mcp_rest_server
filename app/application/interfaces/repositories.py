@@ -1,20 +1,19 @@
 """Repository port interfaces."""
 
-from abc import ABC, abstractmethod
 from typing import Any, Protocol
 from uuid import UUID
 
+from app.domain.entities.data_table import DataTable
 from app.domain.entities.document import Document
 from app.domain.entities.document_link import DocumentLink
 from app.domain.entities.document_table_link import DocumentTableLink
 from app.domain.entities.embedding_chunk import EmbeddingChunk
 from app.domain.entities.folder import Folder
+from app.domain.entities.table_relationship import TableRelationship
+from app.domain.entities.table_row import TableRow
 from app.domain.entities.tag import Tag
 from app.domain.entities.user import User
 from app.domain.entities.vault import Vault
-from app.domain.entities.data_table import DataTable
-from app.domain.entities.table_row import TableRow
-from app.domain.entities.table_relationship import TableRelationship
 
 
 class UserRepository(Protocol):
@@ -36,7 +35,7 @@ class UserRepository(Protocol):
         """Update an existing user."""
         ...
 
-    async def delete(self, user_id: UUID) -> None:
+    async def delete(self, user_id: UUID) -> bool:
         """Delete a user."""
         ...
 
@@ -60,7 +59,7 @@ class VaultRepository(Protocol):
         """Update an existing vault."""
         ...
 
-    async def delete(self, vault_id: UUID) -> None:
+    async def delete(self, vault_id: UUID) -> bool:
         """Delete a vault and all its contents."""
         ...
 
@@ -88,7 +87,7 @@ class FolderRepository(Protocol):
         """Create multiple folders."""
         ...
 
-    async def delete(self, folder_id: UUID) -> None:
+    async def delete(self, folder_id: UUID) -> bool:
         """Delete a folder."""
         ...
 
@@ -128,7 +127,7 @@ class DocumentRepository(Protocol):
         """Update an existing document."""
         ...
 
-    async def delete(self, document_id: UUID) -> None:
+    async def delete(self, document_id: UUID) -> bool:
         """Delete a document."""
         ...
 
@@ -174,7 +173,7 @@ class DocumentLinkRepository(Protocol):
         """Create multiple links."""
         ...
 
-    async def delete(self, link_id: UUID) -> None:
+    async def delete(self, link_id: UUID) -> bool:
         """Delete a link."""
         ...
 
@@ -249,7 +248,7 @@ class TagRepository(Protocol):
         """Update an existing tag."""
         ...
 
-    async def delete(self, tag_id: UUID) -> None:
+    async def delete(self, tag_id: UUID) -> bool:
         """Delete a tag."""
         ...
 
@@ -339,7 +338,7 @@ class TableRepository(Protocol):
         """Update an existing table."""
         ...
 
-    async def delete(self, table_id: UUID) -> None:
+    async def delete(self, table_id: UUID) -> bool:
         """Delete a table."""
         ...
 
@@ -384,7 +383,7 @@ class RowRepository(Protocol):
         """Update an existing row."""
         ...
 
-    async def delete(self, row_id: UUID) -> None:
+    async def delete(self, row_id: UUID) -> bool:
         """Delete a row."""
         ...
 
@@ -451,7 +450,7 @@ class RelationshipRepository(Protocol):
         """Create a new relationship."""
         ...
 
-    async def delete(self, relationship_id: UUID) -> None:
+    async def delete(self, relationship_id: UUID) -> bool:
         """Delete a relationship."""
         ...
 
@@ -509,7 +508,7 @@ class DocumentTableLinkRepository(Protocol):
         """Create multiple links."""
         ...
 
-    async def delete(self, link_id: UUID) -> None:
+    async def delete(self, link_id: UUID) -> bool:
         """Delete a link."""
         ...
 

@@ -120,6 +120,7 @@ class SchemaValidatorService:
         Returns:
             List of error messages
         """
+        _ = exclude_row_id
         errors: list[str] = []
 
         for column in table.schema.columns:

@@ -2,6 +2,7 @@
 
 import io
 import logging
+from typing import Any
 
 from fastapi import APIRouter, File, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -142,7 +143,7 @@ async def ingest_vault(
     graph_provider: GraphProviderDep,
     file: UploadFile = File(...),
     generate_embeddings: bool = True,
-) -> dict:
+) -> dict[str, Any]:
     """Upload and ingest a ZIP file into a vault.
 
     If the vault doesn't exist, it will be created.

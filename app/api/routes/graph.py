@@ -1,6 +1,7 @@
 """Graph routes."""
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -130,7 +131,7 @@ async def get_orphans(
     current_user: CurrentUserDep,
     vault_repo: VaultRepoDep,
     graph_provider: GraphProviderDep,
-) -> dict:
+) -> dict[str, Any]:
     """Get documents with no connections."""
     logger.debug(f"GET /vaults/{slug}/graph/orphans user={current_user.id}")
     vault = await vault_repo.get_by_slug(current_user.id, slug)
@@ -148,7 +149,7 @@ async def get_hubs(
     vault_repo: VaultRepoDep,
     graph_provider: GraphProviderDep,
     limit: int = Query(default=10, ge=1, le=50),
-) -> dict:
+) -> dict[str, Any]:
     """Get most connected documents."""
     logger.debug(f"GET /vaults/{slug}/graph/hubs limit={limit} user={current_user.id}")
     vault = await vault_repo.get_by_slug(current_user.id, slug)

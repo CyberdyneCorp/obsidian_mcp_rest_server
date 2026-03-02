@@ -3,11 +3,14 @@
 from collections import deque
 from dataclasses import dataclass
 from time import monotonic
-from typing import Deque
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import (
+    BaseHTTPMiddleware,
+    RequestResponseEndpoint,
+)
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp
 
 
 @dataclass(frozen=True)
@@ -63,7 +66,7 @@ class InMemoryRateLimiter:
     """Simple in-memory sliding-window limiter."""
 
     def __init__(self) -> None:
-        self._hits: dict[str, Deque[float]] = {}
+        self._hits: dict[str, deque[float]] = {}
 
     def check(self, client_key: str, policy: RateLimitPolicy) -> tuple[bool, int, int]:
         """Check and register a hit.
@@ -91,11 +94,15 @@ class InMemoryRateLimiter:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Apply endpoint-specific in-memory rate limits."""
 
-    def __init__(self, app) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         self._limiter = InMemoryRateLimiter()
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
         if request.method == "OPTIONS":
             return await call_next(request)
 

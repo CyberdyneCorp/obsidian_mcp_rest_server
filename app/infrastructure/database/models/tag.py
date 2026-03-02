@@ -1,12 +1,17 @@
 """Tag SQLAlchemy models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.connection import Base
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class TagModel(Base):
@@ -21,7 +26,7 @@ class TagModel(Base):
     slug: Mapped[str] = mapped_column(String(255), nullable=False)
     parent_tag_id: Mapped[UUID | None] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=True)
     document_count: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
 
     # Relationships
     vault = relationship("VaultModel", back_populates="tags")

@@ -1,8 +1,8 @@
 """FastAPI application entry point."""
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +11,7 @@ from app.api.exception_handlers import register_exception_handlers
 from app.api.rate_limit import RateLimitMiddleware
 from app.api.routes import auth, documents, graph, search, tables, vaults
 from app.config import get_settings
-from app.infrastructure.database.connection import init_db, close_db
+from app.infrastructure.database.connection import close_db, init_db
 
 settings = get_settings()
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
+    _ = app
     logger.info("Starting Obsidian Vault Server...")
     await init_db()
     yield

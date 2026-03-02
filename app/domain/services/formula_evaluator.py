@@ -1,8 +1,9 @@
 """Formula evaluator service for computed columns."""
 
-import re
 import operator
-from typing import Any, Callable
+import re
+from collections.abc import Callable
+from typing import Any
 
 
 class FormulaEvaluatorService:
@@ -18,7 +19,7 @@ class FormulaEvaluatorService:
     """
 
     # Operators with their precedence and functions
-    _OPERATORS: dict[str, tuple[int, Callable]] = {
+    _OPERATORS: dict[str, tuple[int, Callable[[Any, Any], Any]]] = {
         "+": (1, operator.add),
         "-": (1, operator.sub),
         "*": (2, operator.mul),
@@ -63,7 +64,7 @@ class FormulaEvaluatorService:
     def _substitute_columns(self, formula: str, row_data: dict[str, Any]) -> str:
         """Replace {column_name} with actual values."""
 
-        def replace_column(match: re.Match) -> str:
+        def replace_column(match: re.Match[str]) -> str:
             column_name = match.group(1)
             if column_name not in row_data:
                 raise ValueError(f"Unknown column: {column_name}")
@@ -81,7 +82,7 @@ class FormulaEvaluatorService:
     def _evaluate_functions(self, formula: str, row_data: dict[str, Any]) -> str:
         """Evaluate function calls in the formula."""
 
-        def eval_func(match: re.Match) -> str:
+        def eval_func(match: re.Match[str]) -> str:
             func_name = match.group(1).upper()
             args_str = match.group(2)
 
@@ -245,8 +246,8 @@ class FormulaEvaluatorService:
 
         # Current date/time
         if func_name == "NOW":
-            from datetime import datetime
-            return datetime.utcnow().isoformat()
+            from datetime import UTC, datetime
+            return datetime.now(UTC).isoformat()
 
         if func_name == "TODAY":
             from datetime import date
@@ -312,11 +313,8 @@ class FormulaEvaluatorService:
             if tokens[i] in ("*", "/"):
                 left = float(tokens[i - 1])
                 right = float(tokens[i + 1])
-                if tokens[i] == "*":
-                    result = left * right
-                else:
-                    result = left / right if right != 0 else 0
-                tokens = tokens[: i - 1] + [str(result)] + tokens[i + 2 :]
+                op_result = left * right if tokens[i] == "*" else left / right if right != 0 else 0
+                tokens = tokens[: i - 1] + [str(op_result)] + tokens[i + 2 :]
             else:
                 i += 1
 
@@ -326,11 +324,8 @@ class FormulaEvaluatorService:
             if tokens[i] in ("+", "-"):
                 left = float(tokens[i - 1])
                 right = float(tokens[i + 1])
-                if tokens[i] == "+":
-                    result = left + right
-                else:
-                    result = left - right
-                tokens = tokens[: i - 1] + [str(result)] + tokens[i + 2 :]
+                op_result = left + right if tokens[i] == "+" else left - right
+                tokens = tokens[: i - 1] + [str(op_result)] + tokens[i + 2 :]
             else:
                 i += 1
 

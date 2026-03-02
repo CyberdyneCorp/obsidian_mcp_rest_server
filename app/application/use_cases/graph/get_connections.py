@@ -2,12 +2,11 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
-from app.application.interfaces.repositories import DocumentRepository, VaultRepository
 from app.application.interfaces.graph_provider import GraphProvider
+from app.application.interfaces.repositories import DocumentRepository, VaultRepository
 from app.application.use_cases.base import VaultAccessMixin
 from app.domain.exceptions import DocumentNotFoundError
 

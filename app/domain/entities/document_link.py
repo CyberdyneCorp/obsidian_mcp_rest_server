@@ -1,12 +1,17 @@
 """DocumentLink entity representing a link between documents."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class LinkType(str, Enum):
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+class LinkType(StrEnum):
     """Type of document link."""
 
     WIKILINK = "wikilink"  # [[Target]]
@@ -34,7 +39,7 @@ class DocumentLink:
     link_type: LinkType = LinkType.WIKILINK
     is_resolved: bool = False
     position_start: int | None = None  # Character offset in source
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
 
     def __post_init__(self) -> None:
         """Set display text to link text if not provided."""

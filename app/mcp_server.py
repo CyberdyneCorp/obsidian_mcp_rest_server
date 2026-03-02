@@ -1,12 +1,21 @@
 """FastMCP server for Obsidian Vault."""
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Any
+from uuid import UUID
 
 from fastmcp import FastMCP
 
+from app.application.dto.search_dto import SearchQueryDTO
+from app.application.use_cases.document import GetDocumentUseCase, ListDocumentsUseCase
+from app.application.use_cases.graph import GetConnectionsUseCase
+from app.application.use_cases.link import GetBacklinksUseCase
+from app.application.use_cases.search import FulltextSearchUseCase, SemanticSearchUseCase
+from app.application.use_cases.vault import ListVaultsUseCase
 from app.config import get_settings
+from app.infrastructure.age.graph_adapter import AgeGraphAdapter
 from app.infrastructure.database.connection import async_session_maker
 from app.infrastructure.database.repositories import (
     PostgresDocumentLinkRepository,
@@ -14,18 +23,9 @@ from app.infrastructure.database.repositories import (
     PostgresEmbeddingChunkRepository,
     PostgresFolderRepository,
     PostgresTagRepository,
-    PostgresUserRepository,
     PostgresVaultRepository,
 )
 from app.infrastructure.embedding.openai_adapter import OpenAIEmbeddingAdapter
-from app.infrastructure.age.graph_adapter import AgeGraphAdapter
-from app.application.dto.search_dto import SearchQueryDTO
-from app.application.use_cases.document import GetDocumentUseCase, ListDocumentsUseCase
-from app.application.use_cases.link import GetBacklinksUseCase
-from app.application.use_cases.search import SemanticSearchUseCase, FulltextSearchUseCase
-from app.application.use_cases.vault import ListVaultsUseCase
-from app.application.use_cases.graph import GetConnectionsUseCase
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,7 +39,7 @@ mcp = FastMCP(
 
 
 @asynccontextmanager
-async def get_dependencies():
+async def get_dependencies() -> AsyncIterator[dict[str, Any]]:
     """Get dependencies for MCP tools."""
     async with async_session_maker() as session:
         yield {
@@ -57,7 +57,7 @@ async def get_dependencies():
 
 # MCP Tools
 @mcp.tool()
-async def list_vaults(user_id: str) -> list[dict]:
+async def list_vaults(user_id: str) -> list[dict[str, Any]]:
     """List all vaults for a user.
 
     Args:
@@ -87,7 +87,7 @@ async def get_document(
     vault_slug: str,
     path: str | None = None,
     document_id: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Get a document by path or ID.
 
     Args:
@@ -125,7 +125,7 @@ async def search_documents(
     limit: int = 10,
     folder: str | None = None,
     tags: list[str] | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Search documents using semantic or full-text search.
 
     Args:
@@ -154,7 +154,7 @@ async def search_documents(
                 folder=folder,
                 tags=tags or [],
             )
-            results = await use_case.execute(UUID(user_id), vault_slug, search_query)
+            semantic_results = await use_case.execute(UUID(user_id), vault_slug, search_query)
             return [
                 {
                     "id": str(r.document.id),
@@ -163,11 +163,11 @@ async def search_documents(
                     "score": r.score,
                     "matched_chunk": r.matched_chunk,
                 }
-                for r in results
+                for r in semantic_results
             ]
         else:
             use_case_ft = FulltextSearchUseCase(deps["vault_repo"], deps["document_repo"])
-            results = await use_case_ft.execute(UUID(user_id), vault_slug, query, limit, folder)
+            fulltext_results = await use_case_ft.execute(UUID(user_id), vault_slug, query, limit, folder)
             return [
                 {
                     "id": str(r.document.id),
@@ -175,7 +175,7 @@ async def search_documents(
                     "path": r.document.path,
                     "headline": r.headline,
                 }
-                for r in results
+                for r in fulltext_results
             ]
 
 
@@ -184,7 +184,7 @@ async def get_backlinks(
     user_id: str,
     vault_slug: str,
     document_id: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get documents that link to a specific document.
 
     Args:
@@ -223,7 +223,7 @@ async def get_connections(
     vault_slug: str,
     document_id: str,
     depth: int = 2,
-) -> dict:
+) -> dict[str, Any]:
     """Get the document graph around a document.
 
     Args:
@@ -269,7 +269,7 @@ async def list_documents(
     limit: int = 50,
     offset: int = 0,
     folder: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List documents in a vault.
 
     Args:
@@ -305,9 +305,8 @@ async def list_documents(
         }
 
 
-def main():
+def main() -> None:
     """Run the MCP server."""
-    import uvicorn
 
     logger.info("Starting MCP server...")
     mcp.run(transport="sse")

@@ -1,7 +1,6 @@
 """Local filesystem storage adapter."""
 
 import logging
-import os
 import shutil
 from pathlib import Path
 from uuid import UUID

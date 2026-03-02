@@ -1,7 +1,7 @@
 """Database connection and session management."""
 
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
 
@@ -36,7 +36,8 @@ async_session_maker = async_sessionmaker(
 )
 
 # Base class for models
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy models."""
 
 
 async def init_db() -> None:

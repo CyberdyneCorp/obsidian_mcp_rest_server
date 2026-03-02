@@ -2,13 +2,13 @@
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.domain.exceptions import QueryParseError
 
 
-class QueryOperator(str, Enum):
+class QueryOperator(StrEnum):
     """Comparison operators for WHERE clauses."""
 
     EQ = "="
@@ -21,7 +21,7 @@ class QueryOperator(str, Enum):
     IN = "IN"
 
 
-class SortOrder(str, Enum):
+class SortOrder(StrEnum):
     """Sort order direction."""
 
     ASC = "ASC"
@@ -132,10 +132,7 @@ class QueryParserService:
         table_name = table_match.group(2).strip()
 
         # Parse columns
-        if columns_str == "*":
-            columns = []
-        else:
-            columns = [c.strip() for c in columns_str.split(",")]
+        columns = [] if columns_str == "*" else [c.strip() for c in columns_str.split(",")]
 
         # Parse WHERE clause
         where_conditions = []

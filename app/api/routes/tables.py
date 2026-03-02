@@ -1,6 +1,7 @@
 """Table routes."""
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, File, Query, UploadFile, status
@@ -32,6 +33,13 @@ from app.application.dto.table_dto import (
     TableCreateDTO,
     TableUpdateDTO,
 )
+from app.application.use_cases.row import (
+    CreateRowUseCase,
+    DeleteRowUseCase,
+    GetRowUseCase,
+    ListRowsUseCase,
+    UpdateRowUseCase,
+)
 from app.application.use_cases.table import (
     AppendCsvUseCase,
     CreateTableUseCase,
@@ -42,13 +50,6 @@ from app.application.use_cases.table import (
     ImportCsvUseCase,
     ListTablesUseCase,
     UpdateTableUseCase,
-)
-from app.application.use_cases.row import (
-    CreateRowUseCase,
-    DeleteRowUseCase,
-    GetRowUseCase,
-    ListRowsUseCase,
-    UpdateRowUseCase,
 )
 from app.domain.exceptions import DomainException
 
@@ -499,7 +500,7 @@ async def append_csv(
     file: UploadFile = File(...),
     delimiter: str = Query(default=",", description="CSV delimiter"),
     has_header: bool = Query(default=True, description="Whether CSV has header row"),
-) -> dict:
+) -> dict[str, Any]:
     """Append CSV data to an existing table."""
     logger.info(f"POST /vaults/{slug}/tables/{table_slug}/import/csv file={file.filename} user={current_user.id}")
     use_case = AppendCsvUseCase(vault_repo, table_repo, row_repo)
@@ -561,10 +562,10 @@ async def get_documents_referencing_table(
     table_repo: TableRepoDep,
     document_repo: DocumentRepoDep,
     document_table_link_repo: DocumentTableLinkRepoDep,
-) -> dict:
+) -> dict[str, Any]:
     """Get documents that reference this table."""
     logger.debug(f"GET /vaults/{slug}/tables/{table_slug}/documents user={current_user.id}")
-    from app.domain.exceptions import VaultNotFoundError, TableNotFoundError
+    from app.domain.exceptions import TableNotFoundError, VaultNotFoundError
 
     # Get vault
     vault = await vault_repo.get_by_slug(current_user.id, slug)
@@ -580,7 +581,7 @@ async def get_documents_referencing_table(
     links = await document_table_link_repo.get_by_table(table.id)
 
     # Get unique documents
-    doc_ids = list(set(link.document_id for link in links))
+    doc_ids = list({link.document_id for link in links})
     documents = []
     for doc_id in doc_ids:
         doc = await document_repo.get_by_id(doc_id)
@@ -605,8 +606,8 @@ async def execute_query(
     vault_repo: VaultRepoDep,
     table_repo: TableRepoDep,
     row_repo: RowRepoDep,
-    query: dict,
-) -> dict:
+    query: dict[str, Any],
+) -> dict[str, Any]:
     """Execute a dataview-style query.
 
     Query format:

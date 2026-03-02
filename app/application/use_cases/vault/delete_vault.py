@@ -3,8 +3,8 @@
 import logging
 from uuid import UUID
 
-from app.application.interfaces.repositories import VaultRepository
 from app.application.interfaces.graph_provider import GraphProvider
+from app.application.interfaces.repositories import VaultRepository
 from app.application.interfaces.storage import StorageProvider
 from app.application.use_cases.base import VaultAccessMixin
 

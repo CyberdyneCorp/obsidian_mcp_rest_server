@@ -1,12 +1,17 @@
 """DocumentTableLink entity representing a link between a document and a table/row."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class TableLinkType(str, Enum):
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+class TableLinkType(StrEnum):
     """Type of link between document and table."""
 
     TABLE = "table"  # Link to entire table [[table:TableName]]
@@ -29,7 +34,7 @@ class DocumentTableLink:
     link_type: TableLinkType = TableLinkType.TABLE
     link_text: str = ""  # Original link text from document
     position_start: int | None = None  # Character position in document
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
 
     @classmethod
     def create_table_link(

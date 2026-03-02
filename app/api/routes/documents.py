@@ -21,8 +21,8 @@ from app.api.schemas.document import (
 )
 from app.api.schemas.link import (
     BacklinkResponse,
-    BacklinksResponse,
     BacklinkSourceResponse,
+    BacklinksResponse,
     LinkResponse,
     LinksResponse,
     LinkTargetResponse,

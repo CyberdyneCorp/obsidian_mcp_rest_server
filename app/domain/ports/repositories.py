@@ -4,7 +4,7 @@ These are the minimal interfaces that domain services depend on.
 They define the contract for persistence without any infrastructure details.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from app.domain.entities.data_table import DataTable
@@ -35,7 +35,7 @@ class RowRepositoryPort(Protocol):
         """Update an existing row."""
         ...
 
-    async def delete(self, row_id: UUID) -> None:
+    async def delete(self, row_id: UUID) -> bool:
         """Delete a row."""
         ...
 

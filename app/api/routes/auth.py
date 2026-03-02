@@ -1,15 +1,15 @@
 """Authentication routes."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
+import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, HTTPException, status
-import jwt
 
 from app.api.dependencies import (
     CurrentUserDep,
-    SessionDep,
     UserRepoDep,
 )
 from app.api.schemas.auth import (
@@ -21,7 +21,6 @@ from app.api.schemas.auth import (
 )
 from app.config import get_settings
 from app.domain.entities.user import User
-from app.domain.exceptions import DuplicateUserError, InvalidCredentialsError
 
 router = APIRouter()
 settings = get_settings()
@@ -30,7 +29,7 @@ ph = PasswordHasher()
 
 def create_access_token(user_id: str) -> str:
     """Create JWT access token."""
-    expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {
         "sub": user_id,
         "exp": expire,
@@ -42,7 +41,7 @@ def create_access_token(user_id: str) -> str:
 
 def create_refresh_token(user_id: str) -> str:
     """Create JWT refresh token."""
-    expire = datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)
+    expire = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     payload = {
         "sub": user_id,
         "exp": expire,
@@ -104,11 +103,11 @@ async def login(
     # Verify password
     try:
         ph.verify(user.password_hash, data.password)
-    except VerifyMismatchError:
+    except VerifyMismatchError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
-        )
+        ) from err
 
     # Check if active
     if not user.is_active:
@@ -156,19 +155,18 @@ async def refresh(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token",
             )
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token has expired",
-        )
-    except jwt.PyJWTError:
+        ) from err
+    except jwt.PyJWTError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
-        )
+        ) from err
 
     # Verify user exists
-    from uuid import UUID
     user = await user_repo.get_by_id(UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(

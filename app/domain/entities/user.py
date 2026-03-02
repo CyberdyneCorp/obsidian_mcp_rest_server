@@ -1,8 +1,13 @@
 """User entity."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @dataclass
@@ -14,7 +19,7 @@ class User:
     password_hash: str = ""
     display_name: str = ""
     is_active: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
     last_login_at: datetime | None = None
 
     def __post_init__(self) -> None:
@@ -24,7 +29,7 @@ class User:
 
     def update_last_login(self) -> None:
         """Update last login timestamp."""
-        self.last_login_at = datetime.utcnow()
+        self.last_login_at = _utcnow_naive()
 
     def deactivate(self) -> None:
         """Deactivate user account."""

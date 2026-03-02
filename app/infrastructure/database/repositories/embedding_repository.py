@@ -45,7 +45,7 @@ class PostgresEmbeddingChunkRepository:
         )
         result = await self.session.execute(stmt)
         await self.session.flush()
-        count = result.rowcount  # type: ignore
+        count = int(getattr(result, "rowcount", 0) or 0)
         logger.info(f"Deleted {count} embedding chunks for document={document_id}")
         return count
 

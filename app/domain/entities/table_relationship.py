@@ -1,12 +1,17 @@
 """TableRelationship entity representing a foreign key relationship between tables."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class OnDeleteAction(str, Enum):
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+class OnDeleteAction(StrEnum):
     """Action to take when a referenced row is deleted."""
 
     CASCADE = "CASCADE"  # Delete referencing rows
@@ -30,7 +35,7 @@ class TableRelationship:
     target_column: str = "id"
     relationship_name: str = ""
     on_delete: OnDeleteAction = OnDeleteAction.CASCADE
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
 
     @classmethod
     def create(

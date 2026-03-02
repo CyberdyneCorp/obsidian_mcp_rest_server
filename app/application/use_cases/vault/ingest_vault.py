@@ -6,6 +6,8 @@ import zipfile
 from uuid import UUID
 
 from app.application.dto.vault_dto import VaultDTO
+from app.application.interfaces.embedding_provider import EmbeddingProvider
+from app.application.interfaces.graph_provider import GraphProvider
 from app.application.interfaces.repositories import (
     DocumentLinkRepository,
     DocumentRepository,
@@ -14,20 +16,17 @@ from app.application.interfaces.repositories import (
     TagRepository,
     VaultRepository,
 )
-from app.application.interfaces.embedding_provider import EmbeddingProvider
-from app.application.interfaces.graph_provider import GraphProvider
 from app.domain.entities.document import Document
 from app.domain.entities.document_link import DocumentLink, LinkType
 from app.domain.entities.embedding_chunk import EmbeddingChunk
 from app.domain.entities.folder import Folder
-from app.domain.entities.tag import Tag
 from app.domain.entities.vault import Vault
 from app.domain.exceptions import DuplicateVaultError, InvalidDocumentPathError
 from app.domain.services.link_resolver import LinkResolver
 from app.domain.services.markdown_processor import MarkdownProcessor
 from app.domain.services.tag_parser import TagParser
 from app.domain.value_objects.document_path import DocumentPath
-from app.domain.value_objects.frontmatter import Frontmatter
+from app.domain.value_objects.wiki_link import WikiLink
 
 logger = logging.getLogger(__name__)
 
@@ -238,22 +237,21 @@ class IngestVaultUseCase:
         tags: list[str],
     ) -> None:
         """Create tags and associate with document."""
+        _ = document_id
         for tag_name in tags:
             # Expand hierarchical tags
             hierarchy = self.tag_parser.parse_hierarchical_tag(tag_name)
 
-            parent_id = None
             for level_tag in hierarchy:
                 tag = await self.tag_repo.get_or_create(vault_id, level_tag)
                 tag.increment_document_count()
                 await self.tag_repo.update(tag)
-                parent_id = tag.id
 
     async def _create_links(
         self,
         vault_id: UUID,
         document: Document,
-        links: list,  # WikiLink
+        links: list[WikiLink],
     ) -> None:
         """Create link records for a document."""
         link_entities = []
@@ -297,7 +295,7 @@ class IngestVaultUseCase:
         unresolved = await self.link_repo.get_unresolved_links(vault_id)
 
         # Collect resolved links for batch update
-        resolved_links: list[tuple] = []  # (link_id, target_document_id)
+        resolved_links: list[tuple[UUID, UUID]] = []  # (link_id, target_document_id)
 
         for link in unresolved:
             target_lower = link.link_text.lower()
@@ -385,7 +383,7 @@ class IngestVaultUseCase:
             embeddings.extend(batch_embeddings)
 
         # Assign embeddings to chunks
-        for chunk, embedding in zip(all_chunks, embeddings):
+        for chunk, embedding in zip(all_chunks, embeddings, strict=False):
             chunk.set_embedding(embedding)
 
         # Store all chunks

@@ -211,6 +211,7 @@ class AgeGraphAdapter:
 
         AGE doesn't support shortestPath(), so we try paths of increasing length.
         """
+        _ = vault_id
         # Try paths of increasing length (BFS simulation)
         for max_hops in range(1, 6):  # Try up to 5 hops
             query = f"""

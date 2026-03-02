@@ -1,10 +1,15 @@
 """Vault entity - aggregate root for a knowledge vault."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.domain.services.slug import generate_slug
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @dataclass
@@ -21,8 +26,8 @@ class Vault:
     slug: str = ""
     description: str | None = None
     document_count: int = 0
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
+    updated_at: datetime = field(default_factory=_utcnow_naive)
 
     def __post_init__(self) -> None:
         """Generate slug if not provided."""
@@ -57,7 +62,7 @@ class Vault:
 
     def _touch(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow_naive()
 
     @classmethod
     def create(

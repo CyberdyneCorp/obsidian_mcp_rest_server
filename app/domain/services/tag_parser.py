@@ -54,10 +54,7 @@ class TagParser:
         result = []
         current = ""
         for part in parts:
-            if current:
-                current = f"{current}/{part}"
-            else:
-                current = part
+            current = f"{current}/{part}" if current else part
             result.append(f"#{current}")
 
         return result
@@ -105,10 +102,7 @@ class TagParser:
             return False
 
         # No trailing slash
-        if clean_tag.endswith("/"):
-            return False
-
-        return True
+        return not clean_tag.endswith("/")
 
     def get_tag_depth(self, tag: str) -> int:
         """Get the depth of a hierarchical tag.

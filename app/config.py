@@ -1,7 +1,7 @@
 """Application configuration using pydantic-settings."""
 
-from functools import lru_cache
 import os
+from functools import lru_cache
 from typing import Literal
 
 from pydantic import Field, model_validator

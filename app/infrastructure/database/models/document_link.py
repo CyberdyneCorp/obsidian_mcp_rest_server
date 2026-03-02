@@ -1,12 +1,17 @@
 """DocumentLink SQLAlchemy model."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.connection import Base
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class DocumentLinkModel(Base):
@@ -23,7 +28,7 @@ class DocumentLinkModel(Base):
     link_type: Mapped[str] = mapped_column(String(20), nullable=False, default="wikilink")
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     position_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
 
     # Relationships
     vault = relationship("VaultModel", back_populates="links")

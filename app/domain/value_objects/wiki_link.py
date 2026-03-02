@@ -1,14 +1,14 @@
 """WikiLink value object for parsing wiki-style links."""
 
-from dataclasses import dataclass
-from enum import Enum
 import re
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Self
 
 from app.domain.exceptions import InvalidWikiLinkError
 
 
-class WikiLinkType(str, Enum):
+class WikiLinkType(StrEnum):
     """Type of wiki link."""
 
     DOCUMENT = "document"  # Regular document link [[Target]]

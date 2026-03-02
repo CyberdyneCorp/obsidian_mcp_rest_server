@@ -5,12 +5,12 @@ from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
 from app.application.dto.search_dto import SearchQueryDTO, SearchResultDTO
+from app.application.interfaces.embedding_provider import EmbeddingProvider
 from app.application.interfaces.repositories import (
     DocumentRepository,
     EmbeddingChunkRepository,
     VaultRepository,
 )
-from app.application.interfaces.embedding_provider import EmbeddingProvider
 from app.application.use_cases.base import VaultAccessMixin
 from app.domain.exceptions import EmbeddingServiceError
 
@@ -70,9 +70,7 @@ class SemanticSearchUseCase(VaultAccessMixin):
         # Group by document and get best score per document
         doc_scores: dict[UUID, tuple[float, str]] = {}
         for chunk, score in results:
-            if chunk.document_id not in doc_scores:
-                doc_scores[chunk.document_id] = (score, chunk.content)
-            elif score > doc_scores[chunk.document_id][0]:
+            if chunk.document_id not in doc_scores or score > doc_scores[chunk.document_id][0]:
                 doc_scores[chunk.document_id] = (score, chunk.content)
 
         # Build results

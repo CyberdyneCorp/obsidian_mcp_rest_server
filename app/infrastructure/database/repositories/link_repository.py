@@ -1,5 +1,4 @@
 """PostgreSQL document link repository implementation."""
-
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
@@ -34,7 +33,7 @@ class PostgresDocumentLinkRepository(BaseRepository[DocumentLink, DocumentLinkMo
         )
         result = await self.session.execute(stmt)
         await self.session.flush()
-        count = result.rowcount  # type: ignore
+        count = int(getattr(result, "rowcount", 0) or 0)
         self._logger.info(f"Deleted {count} outgoing links from document={source_document_id}")
         return count
 
@@ -110,7 +109,7 @@ class PostgresDocumentLinkRepository(BaseRepository[DocumentLink, DocumentLinkMo
                 )
             )
             result = await self.session.execute(stmt)
-            updated += result.rowcount
+            updated += int(getattr(result, "rowcount", 0) or 0)
 
         await self.session.flush()
         self._logger.info(f"Resolved {updated} document links")

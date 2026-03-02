@@ -1,6 +1,7 @@
 """Document SQLAlchemy model."""
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import ARRAY, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -8,6 +9,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.connection import Base
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class DocumentModel(Base):
@@ -24,13 +30,13 @@ class DocumentModel(Base):
     path: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    frontmatter: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    aliases: Mapped[list] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    frontmatter: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
     link_count: Mapped[int] = mapped_column(Integer, default=0)
     backlink_count: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive, onupdate=_utcnow_naive)
 
     # Relationships
     vault = relationship("VaultModel", back_populates="documents")

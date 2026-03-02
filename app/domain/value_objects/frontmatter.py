@@ -65,6 +65,7 @@ class Frontmatter:
 
         # Handle aliases (can be string or list)
         aliases_raw = data.pop("aliases", [])
+        aliases: tuple[str, ...]
         if isinstance(aliases_raw, str):
             aliases = (aliases_raw,)
         elif isinstance(aliases_raw, list):
@@ -74,6 +75,7 @@ class Frontmatter:
 
         # Handle tags (can be string or list)
         tags_raw = data.pop("tags", [])
+        tags: tuple[str, ...]
         if isinstance(tags_raw, str):
             tags = (tags_raw,)
         elif isinstance(tags_raw, list):
@@ -102,6 +104,7 @@ class Frontmatter:
             title = str(title)
 
         aliases_raw = data.get("aliases", [])
+        aliases: tuple[str, ...]
         if isinstance(aliases_raw, str):
             aliases = (aliases_raw,)
         elif isinstance(aliases_raw, (list, tuple)):
@@ -110,6 +113,7 @@ class Frontmatter:
             aliases = ()
 
         tags_raw = data.get("tags", [])
+        tags: tuple[str, ...]
         if isinstance(tags_raw, str):
             tags = (tags_raw,)
         elif isinstance(tags_raw, (list, tuple)):

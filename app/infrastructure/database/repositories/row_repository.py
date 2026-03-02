@@ -3,8 +3,9 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select, and_, cast, String
+from sqlalchemy import String, and_, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.domain.entities.table_row import TableRow
 from app.infrastructure.database.models.table_row import TableRowModel
@@ -148,9 +149,9 @@ class PostgresRowRepository(BaseRepository[TableRow, TableRowModel]):
         )
         return [self._to_entity(m) for m in models]
 
-    def _build_filter_conditions(self, filters: dict[str, Any]) -> list:
+    def _build_filter_conditions(self, filters: dict[str, Any]) -> list[ColumnElement[bool]]:
         """Build SQLAlchemy filter conditions from a filter dictionary."""
-        conditions = []
+        conditions: list[ColumnElement[bool]] = []
 
         for key, value in filters.items():
             if isinstance(value, dict):
@@ -171,11 +172,10 @@ class PostgresRowRepository(BaseRepository[TableRow, TableRowModel]):
                         conditions.append(json_field <= str(op_value))
                     elif op == "like":
                         conditions.append(json_field.ilike(str(op_value)))
-                    elif op == "in":
-                        if isinstance(op_value, list):
-                            conditions.append(
-                                json_field.in_([str(v) for v in op_value])
-                            )
+                    elif op == "in" and isinstance(op_value, list):
+                        conditions.append(
+                            json_field.in_([str(v) for v in op_value])
+                        )
             else:
                 # Simple equality
                 json_field = TableRowModel.data[key].astext

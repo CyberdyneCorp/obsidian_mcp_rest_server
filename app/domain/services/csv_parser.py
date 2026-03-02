@@ -42,19 +42,20 @@ class CsvParserService:
             CsvParseError: If CSV parsing fails
         """
         if isinstance(content, bytes):
+            raw_content = content
             try:
-                content = content.decode("utf-8")
+                content = raw_content.decode("utf-8")
             except UnicodeDecodeError:
                 try:
-                    content = content.decode("latin-1")
+                    content = raw_content.decode("latin-1")
                 except UnicodeDecodeError as e:
-                    raise CsvParseError(f"Unable to decode CSV: {e}")
+                    raise CsvParseError(f"Unable to decode CSV: {e}") from e
 
         try:
             reader = csv.reader(io.StringIO(content), delimiter=delimiter)
             rows_raw = list(reader)
         except csv.Error as e:
-            raise CsvParseError(str(e))
+            raise CsvParseError(str(e)) from e
 
         if not rows_raw:
             return [], []

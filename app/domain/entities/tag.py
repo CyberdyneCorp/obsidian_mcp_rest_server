@@ -93,10 +93,7 @@ class Tag:
         result = []
         current = ""
         for part in parts:
-            if current:
-                current = f"{current}/{part}"
-            else:
-                current = part
+            current = f"{current}/{part}" if current else part
             result.append(f"#{current}")
 
         return result

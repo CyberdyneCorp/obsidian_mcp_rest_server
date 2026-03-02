@@ -1,11 +1,11 @@
 """Column type value objects for structured data tables."""
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Self
 
 
-class ColumnType(str, Enum):
+class ColumnType(StrEnum):
     """Column data types for table columns."""
 
     TEXT = "text"  # String values
@@ -277,12 +277,12 @@ class TableSchema:
 
         # Validate each provided value
         for key, value in data.items():
-            col = self.get_column(key)
-            if col is None:
+            column = self.get_column(key)
+            if column is None:
                 # Unknown column - could be ignored or treated as error
                 continue
 
-            is_valid, error = col.validate_value(value)
+            is_valid, error = column.validate_value(value)
             if not is_valid and error:
                 errors.append(error)
 

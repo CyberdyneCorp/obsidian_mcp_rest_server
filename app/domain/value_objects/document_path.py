@@ -110,10 +110,7 @@ class DocumentPath:
         else:
             new_filename = self.filename + ext
 
-        if self.folder_path:
-            new_path = f"{self.folder_path}/{new_filename}"
-        else:
-            new_path = new_filename
+        new_path = f"{self.folder_path}/{new_filename}" if self.folder_path else new_filename
 
         return type(self)(new_path)
 

@@ -1,16 +1,17 @@
 """API dependencies for dependency injection."""
 
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 from uuid import UUID
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.domain.entities.user import User
-from app.domain.exceptions import VaultNotFoundError
+from app.infrastructure.age.graph_adapter import AgeGraphAdapter
 from app.infrastructure.database.connection import async_session_maker
 from app.infrastructure.database.repositories import (
     PostgresDocumentLinkRepository,
@@ -26,7 +27,6 @@ from app.infrastructure.database.repositories import (
     PostgresVaultRepository,
 )
 from app.infrastructure.embedding.openai_adapter import OpenAIEmbeddingAdapter
-from app.infrastructure.age.graph_adapter import AgeGraphAdapter
 from app.infrastructure.storage.local_storage import LocalStorageAdapter
 
 settings = get_settings()
@@ -71,14 +71,14 @@ async def get_current_user(
         user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.PyJWTError:
-        raise credentials_exception
+        ) from err
+    except jwt.PyJWTError as err:
+        raise credentials_exception from err
 
     user_repo = PostgresUserRepository(session)
     user = await user_repo.get_by_id(UUID(user_id))

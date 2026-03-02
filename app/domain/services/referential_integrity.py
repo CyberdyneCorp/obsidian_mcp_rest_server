@@ -1,14 +1,15 @@
 """Referential integrity service for foreign key handling."""
 
+from typing import Any
 from uuid import UUID
 
+from app.domain.entities.table_relationship import OnDeleteAction
+from app.domain.exceptions import ReferentialIntegrityError
 from app.domain.ports.repositories import (
     RelationshipRepositoryPort,
     RowRepositoryPort,
     TableRepositoryPort,
 )
-from app.domain.entities.table_relationship import OnDeleteAction
-from app.domain.exceptions import ReferentialIntegrityError
 
 
 class ReferentialIntegrityService:
@@ -34,7 +35,7 @@ class ReferentialIntegrityService:
     async def validate_references(
         self,
         table_id: UUID,
-        row_data: dict,
+        row_data: dict[str, Any],
     ) -> None:
         """Validate that all reference columns point to existing rows.
 
@@ -60,10 +61,10 @@ class ReferentialIntegrityService:
             # Check if the referenced row exists
             try:
                 referenced_row_id = UUID(str(reference_value))
-            except ValueError:
+            except ValueError as err:
                 raise ReferentialIntegrityError(
                     f"Invalid UUID in reference column '{column_name}': {reference_value}"
-                )
+                ) from err
 
             referenced_row = await self.row_repo.get_by_id(referenced_row_id)
             if not referenced_row:

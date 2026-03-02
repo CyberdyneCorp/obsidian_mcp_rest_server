@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.domain.entities.document_link import DocumentLink, LinkType
+from app.domain.entities.document_link import DocumentLink
 
 
 @dataclass

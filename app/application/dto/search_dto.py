@@ -1,7 +1,6 @@
 """Search DTOs."""
 
 from dataclasses import dataclass, field
-from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
 

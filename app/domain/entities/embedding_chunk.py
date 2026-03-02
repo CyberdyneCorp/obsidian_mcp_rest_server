@@ -1,8 +1,13 @@
 """EmbeddingChunk entity for document embeddings."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @dataclass
@@ -20,7 +25,7 @@ class EmbeddingChunk:
     content: str = ""  # Chunk text
     token_count: int = 0  # Number of tokens
     embedding: list[float] = field(default_factory=list)  # Vector (1536 dims)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
 
     def set_embedding(self, embedding: list[float]) -> None:
         """Set the embedding vector."""

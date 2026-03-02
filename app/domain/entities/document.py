@@ -1,11 +1,16 @@
 """Document entity representing a Markdown document."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import UUID, uuid4
 
 from app.domain.value_objects.frontmatter import Frontmatter
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC timestamp as naive datetime for TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @dataclass
@@ -29,8 +34,8 @@ class Document:
     word_count: int = 0
     link_count: int = 0
     backlink_count: int = 0
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=_utcnow_naive)
+    updated_at: datetime = field(default_factory=_utcnow_naive)
 
     def __post_init__(self) -> None:
         """Initialize computed fields."""
@@ -100,7 +105,7 @@ class Document:
 
     def _touch(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow_naive()
 
     def has_changed(self, new_content: str) -> bool:
         """Check if content has changed by comparing hashes."""
