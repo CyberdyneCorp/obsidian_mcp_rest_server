@@ -1,5 +1,6 @@
 """Delete document use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.interfaces.repositories import (
@@ -9,10 +10,11 @@ from app.application.interfaces.repositories import (
     VaultRepository,
 )
 from app.application.interfaces.graph_provider import GraphProvider
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import DocumentNotFoundError
 
 
-class DeleteDocumentUseCase:
+class DeleteDocumentUseCase(VaultAccessMixin):
     """Use case for deleting a document."""
 
     def __init__(
@@ -28,6 +30,7 @@ class DeleteDocumentUseCase:
         self.link_repo = link_repo
         self.embedding_repo = embedding_repo
         self.graph_provider = graph_provider
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -46,10 +49,7 @@ class DeleteDocumentUseCase:
             VaultNotFoundError: If vault not found
             DocumentNotFoundError: If document not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get document
         document = await self.document_repo.get_by_id(document_id)
@@ -73,3 +73,4 @@ class DeleteDocumentUseCase:
         # Update vault document count
         vault.decrement_document_count()
         await self.vault_repo.update(vault)
+        self._logger.info(f"Deleted document id={document_id} from vault={vault_slug}")

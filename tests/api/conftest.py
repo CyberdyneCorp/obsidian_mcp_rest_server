@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
 from app.domain.entities.user import User
 from app.domain.entities.vault import Vault
 from app.infrastructure.database.connection import Base
+from tests.fixtures import create_test_user, create_test_vault
 
 
 # Use test database URL
@@ -92,13 +93,7 @@ async def mock_user(db_session: AsyncSession, clean_db) -> User:
     )
 
     repo = PostgresUserRepository(db_session)
-
-    user = User(
-        email="testuser@example.com",
-        password_hash="hashed_password_for_testing",
-        display_name="Test User",
-        is_active=True,
-    )
+    user = create_test_user(email="testuser@example.com")
 
     created_user = await repo.create(user)
     await db_session.commit()
@@ -114,13 +109,7 @@ async def mock_vault(db_session: AsyncSession, mock_user: User) -> Vault:
     )
 
     repo = PostgresVaultRepository(db_session)
-
-    vault = Vault(
-        user_id=mock_user.id,
-        name="Test Vault",
-        slug="test-vault",
-        document_count=5,
-    )
+    vault = create_test_vault(user_id=mock_user.id, document_count=5)
 
     created_vault = await repo.create(vault)
     await db_session.commit()
@@ -133,8 +122,12 @@ def app(mock_user: User, db_session: AsyncSession) -> FastAPI:
     """Create test FastAPI application with mocked dependencies."""
     from app.api.routes import auth, vaults, documents, search, graph
     from app.api.dependencies import get_current_user, get_db_session
+    from app.api.exception_handlers import register_exception_handlers
 
     app = FastAPI()
+
+    # Register exception handlers for domain exceptions
+    register_exception_handlers(app)
 
     # Override auth dependency to return our test user
     async def override_get_current_user():

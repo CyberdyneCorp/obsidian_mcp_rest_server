@@ -7,29 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.document_table_link import DocumentTableLink, TableLinkType
 from app.infrastructure.database.models.document_table_link import DocumentTableLinkModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresDocumentTableLinkRepository:
+class PostgresDocumentTableLinkRepository(BaseRepository[DocumentTableLink, DocumentTableLinkModel]):
     """PostgreSQL implementation of DocumentTableLinkRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, link_id: UUID) -> DocumentTableLink | None:
-        """Get link by ID."""
-        stmt = select(DocumentTableLinkModel).where(
-            DocumentTableLinkModel.id == link_id
-        )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def create(self, link: DocumentTableLink) -> DocumentTableLink:
-        """Create a new link."""
-        model = self._to_model(link)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
+    def _get_model_class(self) -> type[DocumentTableLinkModel]:
+        return DocumentTableLinkModel
 
     async def create_many(
         self, links: list[DocumentTableLink]
@@ -38,18 +26,8 @@ class PostgresDocumentTableLinkRepository:
         models = [self._to_model(link) for link in links]
         self.session.add_all(models)
         await self.session.flush()
+        self._logger.info(f"Created {len(models)} document-table links")
         return [self._to_entity(m) for m in models]
-
-    async def delete(self, link_id: UUID) -> None:
-        """Delete a link."""
-        stmt = select(DocumentTableLinkModel).where(
-            DocumentTableLinkModel.id == link_id
-        )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     async def delete_by_document(self, document_id: UUID) -> int:
         """Delete all links from a document. Returns count deleted."""
@@ -62,6 +40,7 @@ class PostgresDocumentTableLinkRepository:
         for model in models:
             await self.session.delete(model)
         await self.session.flush()
+        self._logger.info(f"Deleted {count} document-table links from document={document_id}")
         return count
 
     async def get_by_document(self, document_id: UUID) -> list[DocumentTableLink]:
@@ -73,6 +52,7 @@ class PostgresDocumentTableLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} table links in document={document_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_by_table(self, table_id: UUID) -> list[DocumentTableLink]:
@@ -84,6 +64,7 @@ class PostgresDocumentTableLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} documents linking to table={table_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_by_row(self, row_id: UUID) -> list[DocumentTableLink]:
@@ -95,6 +76,7 @@ class PostgresDocumentTableLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} documents linking to row={row_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_table_links_only(self, document_id: UUID) -> list[DocumentTableLink]:

@@ -1,14 +1,15 @@
 """Fulltext search use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
 from app.application.dto.search_dto import FulltextSearchResultDTO
 from app.application.interfaces.repositories import DocumentRepository, VaultRepository
-from app.domain.exceptions import VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
 
 
-class FulltextSearchUseCase:
+class FulltextSearchUseCase(VaultAccessMixin):
     """Use case for full-text search."""
 
     def __init__(
@@ -18,6 +19,7 @@ class FulltextSearchUseCase:
     ) -> None:
         self.vault_repo = vault_repo
         self.document_repo = document_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -42,10 +44,7 @@ class FulltextSearchUseCase:
         Raises:
             VaultNotFoundError: If vault not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Search documents
         documents = await self.document_repo.search_fulltext(
@@ -71,6 +70,7 @@ class FulltextSearchUseCase:
                 )
             )
 
+        self._logger.debug(f"Fulltext search returned {len(results)} results for query='{query}' in vault={vault_slug}")
         return results
 
     def _generate_headline(

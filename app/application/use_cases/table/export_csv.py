@@ -1,5 +1,6 @@
 """Export CSV use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.interfaces.repositories import (
@@ -7,11 +8,11 @@ from app.application.interfaces.repositories import (
     TableRepository,
     VaultRepository,
 )
-from app.domain.exceptions import TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import TableAccessMixin
 from app.domain.services.csv_parser import CsvParserService
 
 
-class ExportCsvUseCase:
+class ExportCsvUseCase(TableAccessMixin):
     """Use case for exporting table data to CSV."""
 
     def __init__(
@@ -24,6 +25,7 @@ class ExportCsvUseCase:
         self.table_repo = table_repo
         self.row_repo = row_repo
         self.csv_parser = CsvParserService()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -47,15 +49,7 @@ class ExportCsvUseCase:
             VaultNotFoundError: If vault not found
             TableNotFoundError: If table not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
-
-        # Get table
-        table = await self.table_repo.get_by_slug(vault.id, table_slug)
-        if not table:
-            raise TableNotFoundError(slug=table_slug)
+        _, table = await self.get_table_or_raise(user_id, vault_slug, table_slug)
 
         # Get all rows (no pagination for export)
         rows = await self.row_repo.list_by_table(
@@ -78,5 +72,6 @@ class ExportCsvUseCase:
         )
 
         filename = f"{table.slug}.csv"
+        self._logger.info(f"Exported {len(rows)} rows from table={table_slug}")
 
         return csv_content, filename

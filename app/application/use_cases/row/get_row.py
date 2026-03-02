@@ -1,5 +1,6 @@
 """Get row use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.table_dto import RowDTO
@@ -8,10 +9,10 @@ from app.application.interfaces.repositories import (
     TableRepository,
     VaultRepository,
 )
-from app.domain.exceptions import RowNotFoundError, TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import RowAccessMixin
 
 
-class GetRowUseCase:
+class GetRowUseCase(RowAccessMixin):
     """Use case for getting a row."""
 
     def __init__(
@@ -23,6 +24,7 @@ class GetRowUseCase:
         self.vault_repo = vault_repo
         self.table_repo = table_repo
         self.row_repo = row_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -47,19 +49,7 @@ class GetRowUseCase:
             TableNotFoundError: If table not found
             RowNotFoundError: If row not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
-
-        # Get table
-        table = await self.table_repo.get_by_slug(vault.id, table_slug)
-        if not table:
-            raise TableNotFoundError(slug=table_slug)
-
-        # Get row
-        row = await self.row_repo.get_by_id(row_id)
-        if not row or row.table_id != table.id:
-            raise RowNotFoundError(str(row_id))
+        _, _, row = await self.get_row_or_raise(user_id, vault_slug, table_slug, row_id)
+        self._logger.debug(f"Retrieved row id={row_id}")
 
         return RowDTO.from_entity(row)

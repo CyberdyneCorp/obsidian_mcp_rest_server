@@ -1,5 +1,6 @@
 """Sync links use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.interfaces.repositories import (
@@ -7,13 +8,14 @@ from app.application.interfaces.repositories import (
     DocumentRepository,
     VaultRepository,
 )
+from app.application.use_cases.base import VaultAccessMixin
 from app.domain.entities.document_link import DocumentLink, LinkType
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.domain.exceptions import DocumentNotFoundError
 from app.domain.services.link_resolver import LinkResolver
 from app.domain.services.markdown_processor import MarkdownProcessor
 
 
-class SyncLinksUseCase:
+class SyncLinksUseCase(VaultAccessMixin):
     """Use case for syncing links after document update."""
 
     def __init__(
@@ -27,6 +29,7 @@ class SyncLinksUseCase:
         self.link_repo = link_repo
         self.markdown_processor = MarkdownProcessor()
         self.link_resolver = LinkResolver()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -48,10 +51,7 @@ class SyncLinksUseCase:
             VaultNotFoundError: If vault not found
             DocumentNotFoundError: If document not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get document
         document = await self.document_repo.get_by_id(document_id)
@@ -103,5 +103,6 @@ class SyncLinksUseCase:
         # Update document link count
         document.set_link_count(len(new_links))
         await self.document_repo.update(document)
+        self._logger.info(f"Synced {len(new_links)} links for document={document_id}")
 
         return len(new_links)

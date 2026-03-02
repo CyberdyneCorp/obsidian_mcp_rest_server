@@ -1,5 +1,6 @@
 """Execute query use case."""
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -8,11 +9,12 @@ from app.application.interfaces.repositories import (
     TableRepository,
     VaultRepository,
 )
-from app.domain.exceptions import QueryParseError, TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import TableNotFoundError
 from app.domain.services.query_parser import QueryParserService
 
 
-class ExecuteQueryUseCase:
+class ExecuteQueryUseCase(VaultAccessMixin):
     """Use case for executing dataview-style queries."""
 
     def __init__(
@@ -25,6 +27,7 @@ class ExecuteQueryUseCase:
         self.table_repo = table_repo
         self.row_repo = row_repo
         self.query_parser = QueryParserService()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -47,10 +50,7 @@ class ExecuteQueryUseCase:
             TableNotFoundError: If table not found
             QueryParseError: If query syntax is invalid
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Parse query
         parsed = self.query_parser.parse(query_string)
@@ -100,6 +100,7 @@ class ExecuteQueryUseCase:
                 row_data[col] = row.data.get(col)
             result_rows.append(row_data)
 
+        self._logger.debug(f"Executed query on table={parsed.table_name}, returned {len(result_rows)} rows")
         return {
             "columns": columns,
             "rows": result_rows,

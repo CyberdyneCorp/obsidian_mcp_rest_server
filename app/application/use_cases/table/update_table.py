@@ -1,14 +1,15 @@
 """Update table use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.table_dto import TableDTO, TableUpdateDTO
 from app.application.interfaces.repositories import TableRepository, VaultRepository
-from app.domain.exceptions import TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import TableAccessMixin
 from app.domain.value_objects.column_type import TableSchema
 
 
-class UpdateTableUseCase:
+class UpdateTableUseCase(TableAccessMixin):
     """Use case for updating a table."""
 
     def __init__(
@@ -18,6 +19,7 @@ class UpdateTableUseCase:
     ) -> None:
         self.vault_repo = vault_repo
         self.table_repo = table_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -41,15 +43,7 @@ class UpdateTableUseCase:
             VaultNotFoundError: If vault not found
             TableNotFoundError: If table not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
-
-        # Get table
-        table = await self.table_repo.get_by_slug(vault.id, table_slug)
-        if not table:
-            raise TableNotFoundError(slug=table_slug)
+        _, table = await self.get_table_or_raise(user_id, vault_slug, table_slug)
 
         # Update fields
         if data.name is not None:
@@ -64,5 +58,6 @@ class UpdateTableUseCase:
 
         # Persist changes
         table = await self.table_repo.update(table)
+        self._logger.info(f"Updated table slug={table_slug}")
 
         return TableDTO.from_entity(table)

@@ -1,13 +1,14 @@
 """List tables use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.table_dto import TableSummaryDTO
 from app.application.interfaces.repositories import TableRepository, VaultRepository
-from app.domain.exceptions import VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
 
 
-class ListTablesUseCase:
+class ListTablesUseCase(VaultAccessMixin):
     """Use case for listing tables in a vault."""
 
     def __init__(
@@ -17,6 +18,7 @@ class ListTablesUseCase:
     ) -> None:
         self.vault_repo = vault_repo
         self.table_repo = table_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -39,10 +41,7 @@ class ListTablesUseCase:
         Raises:
             VaultNotFoundError: If vault not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get tables
         tables = await self.table_repo.list_by_vault(vault.id, limit=limit, offset=offset)
@@ -50,5 +49,6 @@ class ListTablesUseCase:
 
         # Convert to DTOs
         table_dtos = [TableSummaryDTO.from_entity(t) for t in tables]
+        self._logger.debug(f"Listed {len(table_dtos)} tables in vault={vault_slug}")
 
         return table_dtos, total

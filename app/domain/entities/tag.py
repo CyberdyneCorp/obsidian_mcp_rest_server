@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from slugify import slugify
+from app.domain.services.slug import generate_slug
 
 
 @dataclass
@@ -26,7 +26,7 @@ class Tag:
         if self.name and not self.slug:
             # Remove # prefix if present
             clean_name = self.name.lstrip("#")
-            self.slug = slugify(clean_name, separator="-")
+            self.slug = generate_slug(clean_name, separator="-")
 
     @property
     def is_hierarchical(self) -> bool:

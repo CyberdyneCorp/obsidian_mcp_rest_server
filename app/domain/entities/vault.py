@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from slugify import slugify
+from app.domain.services.slug import generate_slug
 
 
 @dataclass
@@ -27,12 +27,12 @@ class Vault:
     def __post_init__(self) -> None:
         """Generate slug if not provided."""
         if self.name and not self.slug:
-            self.slug = slugify(self.name, max_length=100)
+            self.slug = generate_slug(self.name, max_length=100)
 
     def update_name(self, name: str) -> None:
         """Update vault name and regenerate slug."""
         self.name = name
-        self.slug = slugify(name, max_length=100)
+        self.slug = generate_slug(name, max_length=100)
         self._touch()
 
     def update_description(self, description: str | None) -> None:
@@ -70,6 +70,6 @@ class Vault:
         return cls(
             user_id=user_id,
             name=name,
-            slug=slugify(name, max_length=100),
+            slug=generate_slug(name, max_length=100),
             description=description,
         )

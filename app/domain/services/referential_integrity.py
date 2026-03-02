@@ -2,10 +2,10 @@
 
 from uuid import UUID
 
-from app.application.interfaces.repositories import (
-    RelationshipRepository,
-    RowRepository,
-    TableRepository,
+from app.domain.ports.repositories import (
+    RelationshipRepositoryPort,
+    RowRepositoryPort,
+    TableRepositoryPort,
 )
 from app.domain.entities.table_relationship import OnDeleteAction
 from app.domain.exceptions import ReferentialIntegrityError
@@ -23,9 +23,9 @@ class ReferentialIntegrityService:
 
     def __init__(
         self,
-        relationship_repo: RelationshipRepository,
-        table_repo: TableRepository,
-        row_repo: RowRepository,
+        relationship_repo: RelationshipRepositoryPort,
+        table_repo: TableRepositoryPort,
+        row_repo: RowRepositoryPort,
     ) -> None:
         self.relationship_repo = relationship_repo
         self.table_repo = table_repo

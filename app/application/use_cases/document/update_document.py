@@ -1,5 +1,6 @@
 """Update document use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentDTO, DocumentUpdateDTO
@@ -8,12 +9,13 @@ from app.application.interfaces.repositories import (
     DocumentRepository,
     VaultRepository,
 )
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import DocumentNotFoundError
 from app.domain.services.markdown_processor import MarkdownProcessor
 from app.domain.value_objects.frontmatter import Frontmatter
 
 
-class UpdateDocumentUseCase:
+class UpdateDocumentUseCase(VaultAccessMixin):
     """Use case for updating a document."""
 
     def __init__(
@@ -26,6 +28,7 @@ class UpdateDocumentUseCase:
         self.document_repo = document_repo
         self.link_repo = link_repo
         self.markdown_processor = MarkdownProcessor()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -49,10 +52,7 @@ class UpdateDocumentUseCase:
             VaultNotFoundError: If vault not found
             DocumentNotFoundError: If document not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get document
         document = await self.document_repo.get_by_id(document_id)
@@ -76,5 +76,6 @@ class UpdateDocumentUseCase:
 
         # Save document
         document = await self.document_repo.update(document)
+        self._logger.info(f"Updated document id={document_id}")
 
         return DocumentDTO.from_entity(document)

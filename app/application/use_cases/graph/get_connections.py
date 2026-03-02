@@ -1,5 +1,6 @@
 """Get connections use case."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -7,7 +8,8 @@ from uuid import UUID
 from app.application.dto.document_dto import DocumentSummaryDTO
 from app.application.interfaces.repositories import DocumentRepository, VaultRepository
 from app.application.interfaces.graph_provider import GraphProvider
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import DocumentNotFoundError
 
 
 @dataclass
@@ -27,7 +29,7 @@ class GraphResultDTO:
     connections: list[ConnectionDTO]
 
 
-class GetConnectionsUseCase:
+class GetConnectionsUseCase(VaultAccessMixin):
     """Use case for getting document connections in the graph."""
 
     def __init__(
@@ -39,6 +41,7 @@ class GetConnectionsUseCase:
         self.vault_repo = vault_repo
         self.document_repo = document_repo
         self.graph_provider = graph_provider
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -62,10 +65,7 @@ class GetConnectionsUseCase:
             VaultNotFoundError: If vault not found
             DocumentNotFoundError: If document not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get center document
         document = await self.document_repo.get_by_id(document_id)
@@ -95,6 +95,7 @@ class GetConnectionsUseCase:
                     )
                 )
 
+        self._logger.debug(f"Found {len(connections)} connections for document={document_id}")
         return GraphResultDTO(
             center=DocumentSummaryDTO.from_entity(document),
             connections=connections,
@@ -118,10 +119,7 @@ class GetConnectionsUseCase:
         Returns:
             List of documents in path, or None if no path exists
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get path
         path = await self.graph_provider.get_shortest_path(
@@ -140,4 +138,5 @@ class GetConnectionsUseCase:
             if doc:
                 result.append(DocumentSummaryDTO.from_entity(doc))
 
+        self._logger.debug(f"Found path with {len(result)} nodes from {source_id} to {target_id}")
         return result

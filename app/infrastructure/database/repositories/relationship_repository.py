@@ -7,40 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.table_relationship import TableRelationship, OnDeleteAction
 from app.infrastructure.database.models.table_relationship import TableRelationshipModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresRelationshipRepository:
+class PostgresRelationshipRepository(BaseRepository[TableRelationship, TableRelationshipModel]):
     """PostgreSQL implementation of RelationshipRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, relationship_id: UUID) -> TableRelationship | None:
-        """Get relationship by ID."""
-        stmt = select(TableRelationshipModel).where(
-            TableRelationshipModel.id == relationship_id
-        )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def create(self, relationship: TableRelationship) -> TableRelationship:
-        """Create a new relationship."""
-        model = self._to_model(relationship)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
-
-    async def delete(self, relationship_id: UUID) -> None:
-        """Delete a relationship."""
-        stmt = select(TableRelationshipModel).where(
-            TableRelationshipModel.id == relationship_id
-        )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
+    def _get_model_class(self) -> type[TableRelationshipModel]:
+        return TableRelationshipModel
 
     async def list_by_vault(self, vault_id: UUID) -> list[TableRelationship]:
         """List all relationships in a vault."""
@@ -51,6 +28,7 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Listed {len(models)} relationships in vault={vault_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_by_source_table(
@@ -62,6 +40,7 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} relationships from source table={source_table_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_by_target_table(
@@ -73,6 +52,7 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} relationships to target table={target_table_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_by_source_column(
@@ -87,7 +67,13 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+
+        if model:
+            self._logger.debug(
+                f"Found relationship for column={source_column} in table={source_table_id}"
+            )
+            return self._to_entity(model)
+        return None
 
     async def get_cascade_relationships(
         self, target_table_id: UUID
@@ -99,6 +85,9 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(
+            f"Found {len(models)} CASCADE relationships for table={target_table_id}"
+        )
         return [self._to_entity(m) for m in models]
 
     async def get_restrict_relationships(
@@ -111,6 +100,9 @@ class PostgresRelationshipRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(
+            f"Found {len(models)} RESTRICT relationships for table={target_table_id}"
+        )
         return [self._to_entity(m) for m in models]
 
     def _to_entity(self, model: TableRelationshipModel) -> TableRelationship:

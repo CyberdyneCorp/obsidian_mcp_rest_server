@@ -1,13 +1,14 @@
 """List documents use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
 from app.application.interfaces.repositories import DocumentRepository, VaultRepository
-from app.domain.exceptions import VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
 
 
-class ListDocumentsUseCase:
+class ListDocumentsUseCase(VaultAccessMixin):
     """Use case for listing documents in a vault."""
 
     def __init__(
@@ -17,6 +18,7 @@ class ListDocumentsUseCase:
     ) -> None:
         self.vault_repo = vault_repo
         self.document_repo = document_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -43,10 +45,7 @@ class ListDocumentsUseCase:
         Raises:
             VaultNotFoundError: If vault not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get documents
         documents = await self.document_repo.list_by_vault(
@@ -61,6 +60,7 @@ class ListDocumentsUseCase:
 
         # Get total count
         total = await self.document_repo.count_by_vault(vault.id)
+        self._logger.debug(f"Listed {len(documents)} documents from vault={vault_slug}")
 
         return (
             [DocumentSummaryDTO.from_entity(d) for d in documents],

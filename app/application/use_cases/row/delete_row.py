@@ -1,5 +1,6 @@
 """Delete row use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.interfaces.repositories import (
@@ -8,11 +9,11 @@ from app.application.interfaces.repositories import (
     TableRepository,
     VaultRepository,
 )
-from app.domain.exceptions import RowNotFoundError, TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import RowAccessMixin
 from app.domain.services.referential_integrity import ReferentialIntegrityService
 
 
-class DeleteRowUseCase:
+class DeleteRowUseCase(RowAccessMixin):
     """Use case for deleting a row."""
 
     def __init__(
@@ -26,6 +27,7 @@ class DeleteRowUseCase:
         self.table_repo = table_repo
         self.row_repo = row_repo
         self.relationship_repo = relationship_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -48,20 +50,7 @@ class DeleteRowUseCase:
             RowNotFoundError: If row not found
             ReferentialIntegrityError: If RESTRICT constraint prevents deletion
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
-
-        # Get table
-        table = await self.table_repo.get_by_slug(vault.id, table_slug)
-        if not table:
-            raise TableNotFoundError(slug=table_slug)
-
-        # Get row
-        row = await self.row_repo.get_by_id(row_id)
-        if not row or row.table_id != table.id:
-            raise RowNotFoundError(str(row_id))
+        _, table, _ = await self.get_row_or_raise(user_id, vault_slug, table_slug, row_id)
 
         # Handle referential integrity (CASCADE, SET NULL, RESTRICT)
         if self.relationship_repo:
@@ -77,3 +66,4 @@ class DeleteRowUseCase:
 
         # Update table row count
         await self.table_repo.increment_row_count(table.id, -1)
+        self._logger.info(f"Deleted row id={row_id} from table={table_slug}")

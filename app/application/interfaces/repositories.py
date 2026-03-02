@@ -485,6 +485,12 @@ class RelationshipRepository(Protocol):
         """Get relationships with CASCADE delete for a target table."""
         ...
 
+    async def get_restrict_relationships(
+        self, target_table_id: UUID
+    ) -> list[TableRelationship]:
+        """Get relationships with RESTRICT delete for a target table."""
+        ...
+
 
 class DocumentTableLinkRepository(Protocol):
     """Port interface for document-table link persistence."""

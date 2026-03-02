@@ -1,6 +1,7 @@
 """Export vault use case."""
 
 import io
+import logging
 import zipfile
 from uuid import UUID
 
@@ -9,11 +10,11 @@ from app.application.interfaces.repositories import (
     FolderRepository,
     VaultRepository,
 )
-from app.domain.exceptions import VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
 from app.domain.services.markdown_processor import MarkdownProcessor
 
 
-class ExportVaultUseCase:
+class ExportVaultUseCase(VaultAccessMixin):
     """Use case for exporting a vault as a ZIP file."""
 
     def __init__(
@@ -26,6 +27,7 @@ class ExportVaultUseCase:
         self.document_repo = document_repo
         self.folder_repo = folder_repo
         self.markdown_processor = MarkdownProcessor()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(self, user_id: UUID, slug: str) -> bytes:
         """Export a vault as a ZIP file.
@@ -40,9 +42,7 @@ class ExportVaultUseCase:
         Raises:
             VaultNotFoundError: If vault not found
         """
-        vault = await self.vault_repo.get_by_slug(user_id, slug)
-        if not vault:
-            raise VaultNotFoundError(slug=slug)
+        vault = await self.get_vault_or_raise(user_id, slug)
 
         # Get all documents
         documents = await self.document_repo.list_by_vault(vault.id, limit=10000)
@@ -60,4 +60,5 @@ class ExportVaultUseCase:
                 # Add to ZIP
                 zf.writestr(doc.path, content.encode("utf-8"))
 
+        self._logger.info(f"Exported vault slug={slug} with {len(documents)} documents")
         return zip_buffer.getvalue()

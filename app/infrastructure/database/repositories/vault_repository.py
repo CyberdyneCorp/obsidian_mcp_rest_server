@@ -2,48 +2,32 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.vault import Vault
 from app.infrastructure.database.models.vault import VaultModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresVaultRepository:
+class PostgresVaultRepository(BaseRepository[Vault, VaultModel]):
     """PostgreSQL implementation of VaultRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, vault_id: UUID) -> Vault | None:
-        """Get vault by ID."""
-        stmt = select(VaultModel).where(VaultModel.id == vault_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    def _get_model_class(self) -> type[VaultModel]:
+        return VaultModel
 
     async def get_by_slug(self, user_id: UUID, slug: str) -> Vault | None:
         """Get vault by user ID and slug."""
-        stmt = select(VaultModel).where(
+        return await self._get_one_by_filter(
             VaultModel.user_id == user_id,
             VaultModel.slug == slug,
         )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def create(self, vault: Vault) -> Vault:
-        """Create a new vault."""
-        model = self._to_model(vault)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
 
     async def update(self, vault: Vault) -> Vault:
         """Update an existing vault."""
-        stmt = select(VaultModel).where(VaultModel.id == vault.id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
+        model = await self._get_model_by_id(vault.id)
 
         if model:
             model.name = vault.name
@@ -52,25 +36,18 @@ class PostgresVaultRepository:
             model.document_count = vault.document_count
             model.updated_at = vault.updated_at
             await self.session.flush()
+            self._logger.info(f"Updated vault id={vault.id}")
             return self._to_entity(model)
 
+        self._logger.warning(f"Cannot update vault: not found with id={vault.id}")
         return vault
-
-    async def delete(self, vault_id: UUID) -> None:
-        """Delete a vault and all its contents."""
-        stmt = select(VaultModel).where(VaultModel.id == vault_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     async def list_by_user(self, user_id: UUID) -> list[Vault]:
         """List all vaults for a user."""
-        stmt = select(VaultModel).where(VaultModel.user_id == user_id).order_by(VaultModel.name)
-        result = await self.session.execute(stmt)
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
+        return await self._list_by_filter(
+            VaultModel.user_id == user_id,
+            order_by=VaultModel.name,
+        )
 
     def _to_entity(self, model: VaultModel) -> Vault:
         """Convert model to entity."""

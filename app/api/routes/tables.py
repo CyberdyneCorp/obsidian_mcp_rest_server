@@ -1,8 +1,9 @@
 """Table routes."""
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 from fastapi.responses import Response
 
 from app.api.dependencies import (
@@ -49,17 +50,10 @@ from app.application.use_cases.row import (
     ListRowsUseCase,
     UpdateRowUseCase,
 )
-from app.domain.exceptions import (
-    CsvParseError,
-    DuplicateTableError,
-    QueryParseError,
-    RowNotFoundError,
-    SchemaValidationError,
-    TableNotFoundError,
-    VaultNotFoundError,
-)
+from app.domain.exceptions import DomainException
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Table endpoints
@@ -73,20 +67,15 @@ async def list_tables(
     offset: int = Query(default=0, ge=0),
 ) -> TableListResponse:
     """List tables in a vault."""
+    logger.debug(f"GET /vaults/{slug}/tables user={current_user.id}")
     use_case = ListTablesUseCase(vault_repo, table_repo)
 
-    try:
-        tables, total = await use_case.execute(
-            current_user.id,
-            slug,
-            limit=limit,
-            offset=offset,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    tables, total = await use_case.execute(
+        current_user.id,
+        slug,
+        limit=limit,
+        offset=offset,
+    )
 
     return TableListResponse(
         tables=[
@@ -116,20 +105,10 @@ async def get_table(
     table_repo: TableRepoDep,
 ) -> TableResponse:
     """Get table by slug."""
+    logger.debug(f"GET /vaults/{slug}/tables/{table_slug} user={current_user.id}")
     use_case = GetTableUseCase(vault_repo, table_repo)
 
-    try:
-        table = await use_case.execute(current_user.id, slug, table_slug)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    table = await use_case.execute(current_user.id, slug, table_slug)
 
     return TableResponse(
         id=table.id,
@@ -170,32 +149,22 @@ async def create_table(
     table_repo: TableRepoDep,
 ) -> TableResponse:
     """Create a new table."""
+    logger.info(f"POST /vaults/{slug}/tables name={data.name} user={current_user.id}")
     use_case = CreateTableUseCase(vault_repo, table_repo)
 
     # Convert pydantic model to list of dicts
     columns = [col.model_dump() for col in data.columns]
 
-    try:
-        table = await use_case.execute(
-            current_user.id,
-            slug,
-            TableCreateDTO(
-                name=data.name,
-                columns=columns,
-                description=data.description,
-                slug=data.slug,
-            ),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DuplicateTableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    table = await use_case.execute(
+        current_user.id,
+        slug,
+        TableCreateDTO(
+            name=data.name,
+            columns=columns,
+            description=data.description,
+            slug=data.slug,
+        ),
+    )
 
     return TableResponse(
         id=table.id,
@@ -233,32 +202,22 @@ async def update_table(
     table_repo: TableRepoDep,
 ) -> TableResponse:
     """Update a table."""
+    logger.info(f"PATCH /vaults/{slug}/tables/{table_slug} user={current_user.id}")
     use_case = UpdateTableUseCase(vault_repo, table_repo)
 
     # Convert pydantic models to list of dicts if provided
     columns = [col.model_dump() for col in data.columns] if data.columns else None
 
-    try:
-        table = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            TableUpdateDTO(
-                name=data.name,
-                description=data.description,
-                columns=columns,
-            ),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    table = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        TableUpdateDTO(
+            name=data.name,
+            description=data.description,
+            columns=columns,
+        ),
+    )
 
     return TableResponse(
         id=table.id,
@@ -298,20 +257,10 @@ async def delete_table(
     table_repo: TableRepoDep,
 ) -> None:
     """Delete a table."""
+    logger.info(f"DELETE /vaults/{slug}/tables/{table_slug} user={current_user.id}")
     use_case = DeleteTableUseCase(vault_repo, table_repo)
 
-    try:
-        await use_case.execute(current_user.id, slug, table_slug)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    await use_case.execute(current_user.id, slug, table_slug)
 
 
 # Row endpoints
@@ -330,29 +279,19 @@ async def list_rows(
     q: str | None = Query(default=None, description="Full-text search query"),
 ) -> RowListResponse:
     """List rows in a table."""
+    logger.debug(f"GET /vaults/{slug}/tables/{table_slug}/rows user={current_user.id}")
     use_case = ListRowsUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        rows, total = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            limit=limit,
-            offset=offset,
-            sort_column=sort,
-            sort_order=order,
-            search_query=q,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    rows, total = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        limit=limit,
+        offset=offset,
+        sort_column=sort,
+        sort_order=order,
+        search_query=q,
+    )
 
     return RowListResponse(
         rows=[
@@ -385,25 +324,10 @@ async def get_row(
     row_repo: RowRepoDep,
 ) -> RowResponse:
     """Get a row by ID."""
+    logger.debug(f"GET /vaults/{slug}/tables/{table_slug}/rows/{row_id} user={current_user.id}")
     use_case = GetRowUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        row = await use_case.execute(current_user.id, slug, table_slug, row_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except RowNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    row = await use_case.execute(current_user.id, slug, table_slug, row_id)
 
     return RowResponse(
         id=row.id,
@@ -429,30 +353,15 @@ async def create_row(
     row_repo: RowRepoDep,
 ) -> RowResponse:
     """Create a new row."""
+    logger.info(f"POST /vaults/{slug}/tables/{table_slug}/rows user={current_user.id}")
     use_case = CreateRowUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        row = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            RowCreateDTO(data=data.data),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except SchemaValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.to_dict(),
-        )
+    row = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        RowCreateDTO(data=data.data),
+    )
 
     return RowResponse(
         id=row.id,
@@ -478,36 +387,16 @@ async def update_row(
     row_repo: RowRepoDep,
 ) -> RowResponse:
     """Update a row."""
+    logger.info(f"PATCH /vaults/{slug}/tables/{table_slug}/rows/{row_id} user={current_user.id}")
     use_case = UpdateRowUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        row = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            row_id,
-            RowUpdateDTO(data=data.data),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except RowNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except SchemaValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.to_dict(),
-        )
+    row = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        row_id,
+        RowUpdateDTO(data=data.data),
+    )
 
     return RowResponse(
         id=row.id,
@@ -532,25 +421,10 @@ async def delete_row(
     row_repo: RowRepoDep,
 ) -> None:
     """Delete a row."""
+    logger.info(f"DELETE /vaults/{slug}/tables/{table_slug}/rows/{row_id} user={current_user.id}")
     use_case = DeleteRowUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        await use_case.execute(current_user.id, slug, table_slug, row_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except RowNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    await use_case.execute(current_user.id, slug, table_slug, row_id)
 
 
 # CSV Import/Export endpoints
@@ -571,6 +445,7 @@ async def import_csv(
     has_header: bool = Query(default=True, description="Whether CSV has header row"),
 ) -> TableResponse:
     """Import CSV file to create a new table."""
+    logger.info(f"POST /vaults/{slug}/tables/import/csv file={file.filename} user={current_user.id}")
     use_case = ImportCsvUseCase(vault_repo, table_repo, row_repo)
 
     content = await file.read()
@@ -578,30 +453,14 @@ async def import_csv(
     # Use filename as table name if not provided
     name = table_name or (file.filename.rsplit(".", 1)[0] if file.filename else "Imported Table")
 
-    try:
-        table = await use_case.execute(
-            current_user.id,
-            slug,
-            content,
-            table_name=name,
-            delimiter=delimiter,
-            has_header=has_header,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DuplicateTableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
-    except CsvParseError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.to_dict(),
-        )
+    table = await use_case.execute(
+        current_user.id,
+        slug,
+        content,
+        table_name=name,
+        delimiter=delimiter,
+        has_header=has_header,
+    )
 
     return TableResponse(
         id=table.id,
@@ -642,34 +501,19 @@ async def append_csv(
     has_header: bool = Query(default=True, description="Whether CSV has header row"),
 ) -> dict:
     """Append CSV data to an existing table."""
+    logger.info(f"POST /vaults/{slug}/tables/{table_slug}/import/csv file={file.filename} user={current_user.id}")
     use_case = AppendCsvUseCase(vault_repo, table_repo, row_repo)
 
     content = await file.read()
 
-    try:
-        imported, skipped = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            content,
-            delimiter=delimiter,
-            has_header=has_header,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except CsvParseError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.to_dict(),
-        )
+    imported, skipped = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        content,
+        delimiter=delimiter,
+        has_header=has_header,
+    )
 
     return {
         "imported": imported,
@@ -688,25 +532,15 @@ async def export_csv(
     delimiter: str = Query(default=",", description="CSV delimiter"),
 ) -> Response:
     """Export table data as CSV."""
+    logger.debug(f"GET /vaults/{slug}/tables/{table_slug}/export/csv user={current_user.id}")
     use_case = ExportCsvUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        csv_content, filename = await use_case.execute(
-            current_user.id,
-            slug,
-            table_slug,
-            delimiter=delimiter,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    csv_content, filename = await use_case.execute(
+        current_user.id,
+        slug,
+        table_slug,
+        delimiter=delimiter,
+    )
 
     return Response(
         content=csv_content,
@@ -729,21 +563,18 @@ async def get_documents_referencing_table(
     document_table_link_repo: DocumentTableLinkRepoDep,
 ) -> dict:
     """Get documents that reference this table."""
+    logger.debug(f"GET /vaults/{slug}/tables/{table_slug}/documents user={current_user.id}")
+    from app.domain.exceptions import VaultNotFoundError, TableNotFoundError
+
     # Get vault
     vault = await vault_repo.get_by_slug(current_user.id, slug)
     if not vault:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Vault with slug '{slug}' not found",
-        )
+        raise VaultNotFoundError(slug=slug)
 
     # Get table
     table = await table_repo.get_by_slug(vault.id, table_slug)
     if not table:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Table with slug '{table_slug}' not found",
-        )
+        raise TableNotFoundError(slug=table_slug)
 
     # Get document links to this table
     links = await document_table_link_repo.get_by_table(table.id)
@@ -796,30 +627,17 @@ async def execute_query(
         - OFFSET n
     """
     query_string = query.get("query", "")
+    logger.debug(f"POST /vaults/{slug}/query query={query_string!r} user={current_user.id}")
+
     if not query_string:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Query string is required",
-        )
+        class MissingQueryError(DomainException):
+            code = "MISSING_QUERY"
+            http_status = 400
+
+        raise MissingQueryError("Query string is required")
 
     use_case = ExecuteQueryUseCase(vault_repo, table_repo, row_repo)
 
-    try:
-        result = await use_case.execute(current_user.id, slug, query_string)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except TableNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except QueryParseError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.to_dict(),
-        )
+    result = await use_case.execute(current_user.id, slug, query_string)
 
     return result

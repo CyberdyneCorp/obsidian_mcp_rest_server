@@ -1,5 +1,6 @@
 """PostgreSQL embedding chunk repository implementation."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -8,9 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities.embedding_chunk import EmbeddingChunk
 from app.infrastructure.database.models.embedding_chunk import EmbeddingChunkModel
 
+logger = logging.getLogger(__name__)
+
 
 class PostgresEmbeddingChunkRepository:
-    """PostgreSQL implementation of EmbeddingChunkRepository."""
+    """PostgreSQL implementation of EmbeddingChunkRepository.
+
+    Note: This repository doesn't extend BaseRepository because it doesn't
+    have standard CRUD operations (no get_by_id, update, etc.).
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -20,6 +27,7 @@ class PostgresEmbeddingChunkRepository:
         model = self._to_model(chunk)
         self.session.add(model)
         await self.session.flush()
+        logger.info(f"Created embedding chunk for document={chunk.document_id}")
         return self._to_entity(model)
 
     async def create_many(self, chunks: list[EmbeddingChunk]) -> list[EmbeddingChunk]:
@@ -27,6 +35,7 @@ class PostgresEmbeddingChunkRepository:
         models = [self._to_model(c) for c in chunks]
         self.session.add_all(models)
         await self.session.flush()
+        logger.info(f"Created {len(models)} embedding chunks")
         return [self._to_entity(m) for m in models]
 
     async def delete_by_document(self, document_id: UUID) -> int:
@@ -36,7 +45,9 @@ class PostgresEmbeddingChunkRepository:
         )
         result = await self.session.execute(stmt)
         await self.session.flush()
-        return result.rowcount  # type: ignore
+        count = result.rowcount  # type: ignore
+        logger.info(f"Deleted {count} embedding chunks for document={document_id}")
+        return count
 
     async def get_by_document(self, document_id: UUID) -> list[EmbeddingChunk]:
         """Get all chunks for a document."""
@@ -47,6 +58,7 @@ class PostgresEmbeddingChunkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        logger.debug(f"Found {len(models)} embedding chunks for document={document_id}")
         return [self._to_entity(m) for m in models]
 
     async def search_similar(
@@ -57,7 +69,6 @@ class PostgresEmbeddingChunkRepository:
         threshold: float = 0.7,
     ) -> list[tuple[EmbeddingChunk, float]]:
         """Search for similar chunks using cosine similarity."""
-        # Use pgvector's cosine distance
         stmt = (
             select(
                 EmbeddingChunkModel,
@@ -71,6 +82,7 @@ class PostgresEmbeddingChunkRepository:
         result = await self.session.execute(stmt)
         rows = result.all()
 
+        logger.debug(f"Similarity search found {len(rows)} chunks in vault={vault_id}")
         return [(self._to_entity(row[0]), float(row[1])) for row in rows]
 
     def _to_entity(self, model: EmbeddingChunkModel) -> EmbeddingChunk:

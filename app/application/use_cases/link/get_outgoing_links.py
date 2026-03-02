@@ -1,5 +1,6 @@
 """Get outgoing links use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.link_dto import LinkDTO
@@ -8,10 +9,11 @@ from app.application.interfaces.repositories import (
     DocumentRepository,
     VaultRepository,
 )
-from app.domain.exceptions import DocumentNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import DocumentNotFoundError
 
 
-class GetOutgoingLinksUseCase:
+class GetOutgoingLinksUseCase(VaultAccessMixin):
     """Use case for getting outgoing links from a document."""
 
     def __init__(
@@ -23,6 +25,7 @@ class GetOutgoingLinksUseCase:
         self.vault_repo = vault_repo
         self.document_repo = document_repo
         self.link_repo = link_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -44,10 +47,7 @@ class GetOutgoingLinksUseCase:
             VaultNotFoundError: If vault not found
             DocumentNotFoundError: If document not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get document
         document = await self.document_repo.get_by_id(document_id)
@@ -77,4 +77,5 @@ class GetOutgoingLinksUseCase:
                 )
             )
 
+        self._logger.debug(f"Found {len(link_dtos)} outgoing links from document={document_id}")
         return link_dtos

@@ -1,5 +1,6 @@
 """Semantic search use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.document_dto import DocumentSummaryDTO
@@ -10,10 +11,11 @@ from app.application.interfaces.repositories import (
     VaultRepository,
 )
 from app.application.interfaces.embedding_provider import EmbeddingProvider
-from app.domain.exceptions import VaultNotFoundError, EmbeddingServiceError
+from app.application.use_cases.base import VaultAccessMixin
+from app.domain.exceptions import EmbeddingServiceError
 
 
-class SemanticSearchUseCase:
+class SemanticSearchUseCase(VaultAccessMixin):
     """Use case for semantic (vector) search."""
 
     def __init__(
@@ -27,6 +29,7 @@ class SemanticSearchUseCase:
         self.document_repo = document_repo
         self.embedding_repo = embedding_repo
         self.embedding_provider = embedding_provider
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -48,10 +51,7 @@ class SemanticSearchUseCase:
             VaultNotFoundError: If vault not found
             EmbeddingServiceError: If embedding generation fails
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         try:
             # Generate query embedding
@@ -104,4 +104,5 @@ class SemanticSearchUseCase:
                 )
             )
 
+        self._logger.debug(f"Semantic search returned {len(search_results)} results for query in vault={vault_slug}")
         return search_results

@@ -2,56 +2,34 @@
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.document import Document
 from app.domain.value_objects.frontmatter import Frontmatter
 from app.infrastructure.database.models.document import DocumentModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresDocumentRepository:
+class PostgresDocumentRepository(BaseRepository[Document, DocumentModel]):
     """PostgreSQL implementation of DocumentRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, document_id: UUID) -> Document | None:
-        """Get document by ID."""
-        stmt = select(DocumentModel).where(DocumentModel.id == document_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    def _get_model_class(self) -> type[DocumentModel]:
+        return DocumentModel
 
     async def get_by_path(self, vault_id: UUID, path: str) -> Document | None:
         """Get document by vault ID and path."""
-        stmt = select(DocumentModel).where(
+        return await self._get_one_by_filter(
             DocumentModel.vault_id == vault_id,
             DocumentModel.path == path,
         )
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def create(self, document: Document) -> Document:
-        """Create a new document."""
-        model = self._to_model(document)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
-
-    async def create_many(self, documents: list[Document]) -> list[Document]:
-        """Create multiple documents."""
-        models = [self._to_model(d) for d in documents]
-        self.session.add_all(models)
-        await self.session.flush()
-        return [self._to_entity(m) for m in models]
 
     async def update(self, document: Document) -> Document:
         """Update an existing document."""
-        stmt = select(DocumentModel).where(DocumentModel.id == document.id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
+        model = await self._get_model_by_id(document.id)
 
         if model:
             model.title = document.title
@@ -64,18 +42,11 @@ class PostgresDocumentRepository:
             model.backlink_count = document.backlink_count
             model.updated_at = document.updated_at
             await self.session.flush()
+            self._logger.info(f"Updated document id={document.id}")
             return self._to_entity(model)
 
+        self._logger.warning(f"Cannot update document: not found with id={document.id}")
         return document
-
-    async def delete(self, document_id: UUID) -> None:
-        """Delete a document."""
-        stmt = select(DocumentModel).where(DocumentModel.id == document_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     async def list_by_vault(
         self,
@@ -84,33 +55,23 @@ class PostgresDocumentRepository:
         offset: int = 0,
     ) -> list[Document]:
         """List documents in a vault with pagination."""
-        stmt = (
-            select(DocumentModel)
-            .where(DocumentModel.vault_id == vault_id)
-            .order_by(DocumentModel.path)
-            .limit(limit)
-            .offset(offset)
+        return await self._list_by_filter(
+            DocumentModel.vault_id == vault_id,
+            order_by=DocumentModel.path,
+            limit=limit,
+            offset=offset,
         )
-        result = await self.session.execute(stmt)
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
 
     async def list_by_folder(self, folder_id: UUID) -> list[Document]:
         """List documents in a specific folder."""
-        stmt = (
-            select(DocumentModel)
-            .where(DocumentModel.folder_id == folder_id)
-            .order_by(DocumentModel.title)
+        return await self._list_by_filter(
+            DocumentModel.folder_id == folder_id,
+            order_by=DocumentModel.title,
         )
-        result = await self.session.execute(stmt)
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
 
     async def count_by_vault(self, vault_id: UUID) -> int:
         """Count documents in a vault."""
-        stmt = select(func.count()).select_from(DocumentModel).where(DocumentModel.vault_id == vault_id)
-        result = await self.session.execute(stmt)
-        return result.scalar() or 0
+        return await self._count_by_filter(DocumentModel.vault_id == vault_id)
 
     async def search_fulltext(
         self,
@@ -119,7 +80,6 @@ class PostgresDocumentRepository:
         limit: int = 20,
     ) -> list[Document]:
         """Full-text search documents."""
-        # Simple ILIKE search for now - can be enhanced with tsvector
         stmt = (
             select(DocumentModel)
             .where(
@@ -130,6 +90,7 @@ class PostgresDocumentRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Fulltext search for '{query}' found {len(models)} documents")
         return [self._to_entity(m) for m in models]
 
     def _to_entity(self, model: DocumentModel) -> Document:

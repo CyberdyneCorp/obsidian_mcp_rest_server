@@ -1,12 +1,13 @@
 """Delete table use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.interfaces.repositories import TableRepository, VaultRepository
-from app.domain.exceptions import TableNotFoundError, VaultNotFoundError
+from app.application.use_cases.base import TableAccessMixin
 
 
-class DeleteTableUseCase:
+class DeleteTableUseCase(TableAccessMixin):
     """Use case for deleting a table."""
 
     def __init__(
@@ -16,6 +17,7 @@ class DeleteTableUseCase:
     ) -> None:
         self.vault_repo = vault_repo
         self.table_repo = table_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -34,15 +36,8 @@ class DeleteTableUseCase:
             VaultNotFoundError: If vault not found
             TableNotFoundError: If table not found
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
-
-        # Get table
-        table = await self.table_repo.get_by_slug(vault.id, table_slug)
-        if not table:
-            raise TableNotFoundError(slug=table_slug)
+        _, table = await self.get_table_or_raise(user_id, vault_slug, table_slug)
 
         # Delete table (cascades to rows)
         await self.table_repo.delete(table.id)
+        self._logger.info(f"Deleted table slug={table_slug}")

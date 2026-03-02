@@ -7,43 +7,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.document_link import DocumentLink, LinkType
 from app.infrastructure.database.models.document_link import DocumentLinkModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresDocumentLinkRepository:
+class PostgresDocumentLinkRepository(BaseRepository[DocumentLink, DocumentLinkModel]):
     """PostgreSQL implementation of DocumentLinkRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, link_id: UUID) -> DocumentLink | None:
-        """Get link by ID."""
-        stmt = select(DocumentLinkModel).where(DocumentLinkModel.id == link_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def create(self, link: DocumentLink) -> DocumentLink:
-        """Create a new link."""
-        model = self._to_model(link)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
+    def _get_model_class(self) -> type[DocumentLinkModel]:
+        return DocumentLinkModel
 
     async def create_many(self, links: list[DocumentLink]) -> list[DocumentLink]:
         """Create multiple links."""
         models = [self._to_model(link) for link in links]
         self.session.add_all(models)
         await self.session.flush()
+        self._logger.info(f"Created {len(models)} document links")
         return [self._to_entity(m) for m in models]
-
-    async def delete(self, link_id: UUID) -> None:
-        """Delete a link."""
-        stmt = select(DocumentLinkModel).where(DocumentLinkModel.id == link_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     async def delete_by_source(self, source_document_id: UUID) -> int:
         """Delete all links from a source document."""
@@ -52,7 +34,9 @@ class PostgresDocumentLinkRepository:
         )
         result = await self.session.execute(stmt)
         await self.session.flush()
-        return result.rowcount  # type: ignore
+        count = result.rowcount  # type: ignore
+        self._logger.info(f"Deleted {count} outgoing links from document={source_document_id}")
+        return count
 
     async def get_outgoing_links(self, document_id: UUID) -> list[DocumentLink]:
         """Get all outgoing links from a document."""
@@ -63,6 +47,7 @@ class PostgresDocumentLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} outgoing links from document={document_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_incoming_links(self, document_id: UUID) -> list[DocumentLink]:
@@ -72,6 +57,7 @@ class PostgresDocumentLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} incoming links to document={document_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_unresolved_links(self, vault_id: UUID) -> list[DocumentLink]:
@@ -82,6 +68,7 @@ class PostgresDocumentLinkRepository:
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Found {len(models)} unresolved links in vault={vault_id}")
         return [self._to_entity(m) for m in models]
 
     async def count_outgoing(self, document_id: UUID) -> int:
@@ -108,10 +95,7 @@ class PostgresDocumentLinkRepository:
         self,
         resolved_links: list[tuple[UUID, UUID]],
     ) -> int:
-        """Bulk update links with resolved target document IDs.
-
-        Uses individual UPDATE statements for compatibility with async SQLAlchemy.
-        """
+        """Bulk update links with resolved target document IDs."""
         if not resolved_links:
             return 0
 
@@ -129,6 +113,7 @@ class PostgresDocumentLinkRepository:
             updated += result.rowcount
 
         await self.session.flush()
+        self._logger.info(f"Resolved {updated} document links")
         return updated
 
     def _to_entity(self, model: DocumentLinkModel) -> DocumentLink:

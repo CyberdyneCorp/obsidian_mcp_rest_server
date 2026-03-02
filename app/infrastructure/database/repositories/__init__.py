@@ -1,5 +1,6 @@
 """Repository implementations."""
 
+from app.infrastructure.database.repositories.base import BaseRepository
 from app.infrastructure.database.repositories.user_repository import PostgresUserRepository
 from app.infrastructure.database.repositories.vault_repository import PostgresVaultRepository
 from app.infrastructure.database.repositories.folder_repository import PostgresFolderRepository
@@ -13,6 +14,7 @@ from app.infrastructure.database.repositories.relationship_repository import Pos
 from app.infrastructure.database.repositories.document_table_link_repository import PostgresDocumentTableLinkRepository
 
 __all__ = [
+    "BaseRepository",
     "PostgresDocumentLinkRepository",
     "PostgresDocumentRepository",
     "PostgresDocumentTableLinkRepository",

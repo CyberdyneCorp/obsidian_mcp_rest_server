@@ -7,40 +7,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.user import User
 from app.infrastructure.database.models.user import UserModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresUserRepository:
+class PostgresUserRepository(BaseRepository[User, UserModel]):
     """PostgreSQL implementation of UserRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, user_id: UUID) -> User | None:
-        """Get user by ID."""
-        stmt = select(UserModel).where(UserModel.id == user_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    def _get_model_class(self) -> type[UserModel]:
+        return UserModel
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         stmt = select(UserModel).where(UserModel.email == email)
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
 
-    async def create(self, user: User) -> User:
-        """Create a new user."""
-        model = self._to_model(user)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
+        if model:
+            self._logger.debug(f"Found user with email={email}")
+            return self._to_entity(model)
+        return None
 
     async def update(self, user: User) -> User:
         """Update an existing user."""
-        stmt = select(UserModel).where(UserModel.id == user.id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
+        model = await self._get_model_by_id(user.id)
 
         if model:
             model.email = user.email
@@ -49,18 +41,11 @@ class PostgresUserRepository:
             model.is_active = user.is_active
             model.last_login_at = user.last_login_at
             await self.session.flush()
+            self._logger.info(f"Updated user id={user.id}")
             return self._to_entity(model)
 
+        self._logger.warning(f"Cannot update user: not found with id={user.id}")
         return user
-
-    async def delete(self, user_id: UUID) -> None:
-        """Delete a user."""
-        stmt = select(UserModel).where(UserModel.id == user_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     def _to_entity(self, model: UserModel) -> User:
         """Convert model to entity."""

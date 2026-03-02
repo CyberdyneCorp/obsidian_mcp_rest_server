@@ -1,5 +1,6 @@
 """Import CSV use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.table_dto import TableDTO
@@ -8,13 +9,14 @@ from app.application.interfaces.repositories import (
     TableRepository,
     VaultRepository,
 )
+from app.application.use_cases.base import VaultAccessMixin
 from app.domain.entities.data_table import DataTable
 from app.domain.entities.table_row import TableRow
-from app.domain.exceptions import DuplicateTableError, TableNotFoundError, VaultNotFoundError
+from app.domain.exceptions import DuplicateTableError, TableNotFoundError
 from app.domain.services.csv_parser import CsvParserService
 
 
-class ImportCsvUseCase:
+class ImportCsvUseCase(VaultAccessMixin):
     """Use case for importing CSV data into a table."""
 
     def __init__(
@@ -27,6 +29,7 @@ class ImportCsvUseCase:
         self.table_repo = table_repo
         self.row_repo = row_repo
         self.csv_parser = CsvParserService()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -57,10 +60,7 @@ class ImportCsvUseCase:
             DuplicateTableError: If table name already exists
             CsvParseError: If CSV parsing fails
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Parse CSV
         headers, rows = self.csv_parser.parse_csv(
@@ -111,10 +111,11 @@ class ImportCsvUseCase:
             table.set_row_count(table.row_count + len(row_entities))
             await self.table_repo.update(table)
 
+        self._logger.info(f"Imported {len(row_entities)} rows into table={table.slug}")
         return TableDTO.from_entity(table)
 
 
-class AppendCsvUseCase:
+class AppendCsvUseCase(VaultAccessMixin):
     """Use case for appending CSV data to an existing table."""
 
     def __init__(
@@ -127,6 +128,7 @@ class AppendCsvUseCase:
         self.table_repo = table_repo
         self.row_repo = row_repo
         self.csv_parser = CsvParserService()
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -155,10 +157,7 @@ class AppendCsvUseCase:
             TableNotFoundError: If table not found
             CsvParseError: If CSV parsing fails
         """
-        # Get vault
-        vault = await self.vault_repo.get_by_slug(user_id, vault_slug)
-        if not vault:
-            raise VaultNotFoundError(slug=vault_slug)
+        vault = await self.get_vault_or_raise(user_id, vault_slug)
 
         # Get table
         table = await self.table_repo.get_by_slug(vault.id, table_slug)
@@ -203,4 +202,5 @@ class AppendCsvUseCase:
             # Update row count
             await self.table_repo.increment_row_count(table.id, len(row_entities))
 
+        self._logger.info(f"Appended {len(row_entities)} rows to table={table_slug}, skipped={skipped}")
         return len(row_entities), skipped

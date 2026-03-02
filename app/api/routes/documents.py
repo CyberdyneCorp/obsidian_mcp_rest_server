@@ -1,8 +1,9 @@
 """Document routes."""
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query, status
 
 from app.api.dependencies import (
     CurrentUserDep,
@@ -38,13 +39,9 @@ from app.application.use_cases.link import (
     GetBacklinksUseCase,
     GetOutgoingLinksUseCase,
 )
-from app.domain.exceptions import (
-    DocumentNotFoundError,
-    DuplicateDocumentError,
-    VaultNotFoundError,
-)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/vaults/{slug}/documents", response_model=DocumentListResponse)
@@ -59,22 +56,17 @@ async def list_documents(
     tag: str | None = None,
 ) -> DocumentListResponse:
     """List documents in a vault."""
+    logger.debug(f"GET /vaults/{slug}/documents user={current_user.id}")
     use_case = ListDocumentsUseCase(vault_repo, document_repo)
 
-    try:
-        documents, total = await use_case.execute(
-            current_user.id,
-            slug,
-            limit=limit,
-            offset=offset,
-            folder=folder,
-            tag=tag,
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    documents, total = await use_case.execute(
+        current_user.id,
+        slug,
+        limit=limit,
+        offset=offset,
+        folder=folder,
+        tag=tag,
+    )
 
     return DocumentListResponse(
         documents=[
@@ -105,20 +97,10 @@ async def get_document(
     document_repo: DocumentRepoDep,
 ) -> DocumentResponse:
     """Get document by ID."""
+    logger.debug(f"GET /vaults/{slug}/documents/{document_id} user={current_user.id}")
     use_case = GetDocumentUseCase(vault_repo, document_repo)
 
-    try:
-        doc = await use_case.execute(current_user.id, slug, document_id=document_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    doc = await use_case.execute(current_user.id, slug, document_id=document_id)
 
     return DocumentResponse(
         id=doc.id,
@@ -150,28 +132,18 @@ async def create_document(
     folder_repo: FolderRepoDep,
 ) -> DocumentResponse:
     """Create a new document."""
+    logger.info(f"POST /vaults/{slug}/documents path={data.path} user={current_user.id}")
     use_case = CreateDocumentUseCase(vault_repo, document_repo, folder_repo)
 
-    try:
-        doc = await use_case.execute(
-            current_user.id,
-            slug,
-            DocumentCreateDTO(
-                path=data.path,
-                content=data.content,
-                frontmatter=data.frontmatter or {},
-            ),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DuplicateDocumentError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    doc = await use_case.execute(
+        current_user.id,
+        slug,
+        DocumentCreateDTO(
+            path=data.path,
+            content=data.content,
+            frontmatter=data.frontmatter or {},
+        ),
+    )
 
     return DocumentResponse(
         id=doc.id,
@@ -200,28 +172,18 @@ async def update_document(
     link_repo: LinkRepoDep,
 ) -> DocumentResponse:
     """Update a document."""
+    logger.info(f"PATCH /vaults/{slug}/documents/{document_id} user={current_user.id}")
     use_case = UpdateDocumentUseCase(vault_repo, document_repo, link_repo)
 
-    try:
-        doc = await use_case.execute(
-            current_user.id,
-            slug,
-            document_id,
-            DocumentUpdateDTO(
-                content=data.content,
-                frontmatter=data.frontmatter,
-            ),
-        )
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    doc = await use_case.execute(
+        current_user.id,
+        slug,
+        document_id,
+        DocumentUpdateDTO(
+            content=data.content,
+            frontmatter=data.frontmatter,
+        ),
+    )
 
     return DocumentResponse(
         id=doc.id,
@@ -252,20 +214,10 @@ async def delete_document(
     link_repo: LinkRepoDep,
 ) -> None:
     """Delete a document."""
+    logger.info(f"DELETE /vaults/{slug}/documents/{document_id} user={current_user.id}")
     use_case = DeleteDocumentUseCase(vault_repo, document_repo, link_repo)
 
-    try:
-        await use_case.execute(current_user.id, slug, document_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    await use_case.execute(current_user.id, slug, document_id)
 
 
 @router.get(
@@ -281,20 +233,10 @@ async def get_outgoing_links(
     link_repo: LinkRepoDep,
 ) -> LinksResponse:
     """Get outgoing links from a document."""
+    logger.debug(f"GET /vaults/{slug}/documents/{document_id}/links/outgoing user={current_user.id}")
     use_case = GetOutgoingLinksUseCase(vault_repo, document_repo, link_repo)
 
-    try:
-        links = await use_case.execute(current_user.id, slug, document_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    links = await use_case.execute(current_user.id, slug, document_id)
 
     return LinksResponse(
         links=[
@@ -330,20 +272,10 @@ async def get_backlinks(
     link_repo: LinkRepoDep,
 ) -> BacklinksResponse:
     """Get backlinks (incoming links) to a document."""
+    logger.debug(f"GET /vaults/{slug}/documents/{document_id}/links/incoming user={current_user.id}")
     use_case = GetBacklinksUseCase(vault_repo, document_repo, link_repo)
 
-    try:
-        backlinks = await use_case.execute(current_user.id, slug, document_id)
-    except VaultNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
-    except DocumentNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    backlinks = await use_case.execute(current_user.id, slug, document_id)
 
     return BacklinksResponse(
         backlinks=[

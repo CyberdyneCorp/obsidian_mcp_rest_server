@@ -7,20 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.folder import Folder
 from app.infrastructure.database.models.folder import FolderModel
+from app.infrastructure.database.repositories.base import BaseRepository
 
 
-class PostgresFolderRepository:
+class PostgresFolderRepository(BaseRepository[Folder, FolderModel]):
     """PostgreSQL implementation of FolderRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+        super().__init__(session)
 
-    async def get_by_id(self, folder_id: UUID) -> Folder | None:
-        """Get folder by ID."""
-        stmt = select(FolderModel).where(FolderModel.id == folder_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    def _get_model_class(self) -> type[FolderModel]:
+        return FolderModel
 
     async def get_by_path(self, vault_id: UUID, path: str) -> Folder | None:
         """Get folder by vault ID and path."""
@@ -30,41 +27,30 @@ class PostgresFolderRepository:
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
 
-    async def create(self, folder: Folder) -> Folder:
-        """Create a new folder."""
-        model = self._to_model(folder)
-        self.session.add(model)
-        await self.session.flush()
-        return self._to_entity(model)
+        if model:
+            self._logger.debug(f"Found folder with path={path} in vault={vault_id}")
+            return self._to_entity(model)
+        return None
 
     async def create_many(self, folders: list[Folder]) -> list[Folder]:
         """Create multiple folders."""
         models = [self._to_model(f) for f in folders]
         self.session.add_all(models)
         await self.session.flush()
+        self._logger.info(f"Created {len(models)} folders")
         return [self._to_entity(m) for m in models]
-
-    async def delete(self, folder_id: UUID) -> None:
-        """Delete a folder."""
-        stmt = select(FolderModel).where(FolderModel.id == folder_id)
-        result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
 
     async def list_by_vault(self, vault_id: UUID) -> list[Folder]:
         """List all folders in a vault."""
         stmt = select(FolderModel).where(FolderModel.vault_id == vault_id).order_by(FolderModel.path)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
+        self._logger.debug(f"Listed {len(models)} folders in vault={vault_id}")
         return [self._to_entity(m) for m in models]
 
     async def get_or_create_path(self, vault_id: UUID, path: str) -> Folder:
         """Get or create a folder at the given path (including parents)."""
-        # Check if already exists
         existing = await self.get_by_path(vault_id, path)
         if existing:
             return existing
@@ -94,6 +80,7 @@ class PostgresFolderRepository:
         # Return the final folder
         final = await self.get_by_path(vault_id, path)
         assert final is not None
+        self._logger.info(f"Created folder path={path} in vault={vault_id}")
         return final
 
     def _to_entity(self, model: FolderModel) -> Folder:

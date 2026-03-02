@@ -1,4 +1,12 @@
-"""Frontmatter value object for YAML document metadata."""
+"""Frontmatter value object for YAML document metadata.
+
+Note: This module uses the yaml library for parsing YAML frontmatter.
+While this introduces an external dependency in the domain layer, it is
+considered acceptable because:
+1. YAML parsing is essential to the domain (Obsidian uses YAML frontmatter)
+2. yaml is a pure data format library with no side effects
+3. No practical alternative exists in the standard library
+"""
 
 from dataclasses import dataclass, field
 from typing import Any, Self

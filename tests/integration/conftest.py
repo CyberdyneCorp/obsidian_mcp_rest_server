@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
 from app.domain.entities.user import User
 from app.domain.entities.vault import Vault
 from app.infrastructure.database.connection import Base
+from tests.fixtures import create_test_user, create_test_vault
 
 
 # Use test database URL from environment or default
@@ -93,13 +94,7 @@ async def test_user(session: AsyncSession, clean_db) -> User:
     )
 
     repo = PostgresUserRepository(session)
-
-    user = User(
-        email="integration@test.com",
-        password_hash="hashed_password",
-        display_name="Integration Test User",
-        is_active=True,
-    )
+    user = create_test_user(email="integration@test.com", display_name="Integration Test User")
 
     created_user = await repo.create(user)
     await session.commit()
@@ -115,12 +110,10 @@ async def test_vault(session: AsyncSession, test_user: User) -> Vault:
     )
 
     repo = PostgresVaultRepository(session)
-
-    vault = Vault(
+    vault = create_test_vault(
         user_id=test_user.id,
         name="Integration Test Vault",
         slug="integration-test-vault",
-        description="Vault for integration tests",
     )
 
     created_vault = await repo.create(vault)

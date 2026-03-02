@@ -1,5 +1,6 @@
 """Create vault use case."""
 
+import logging
 from uuid import UUID
 
 from app.application.dto.vault_dto import VaultCreateDTO, VaultDTO
@@ -13,6 +14,7 @@ class CreateVaultUseCase:
 
     def __init__(self, vault_repo: VaultRepository) -> None:
         self.vault_repo = vault_repo
+        self._logger = logging.getLogger(__name__)
 
     async def execute(
         self,
@@ -45,5 +47,6 @@ class CreateVaultUseCase:
 
         # Save vault
         vault = await self.vault_repo.create(vault)
+        self._logger.info(f"Created vault name='{data.name}' slug={vault.slug}")
 
         return VaultDTO.from_entity(vault)
