@@ -1,10 +1,9 @@
 """Application configuration using pydantic-settings."""
 
-import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +60,10 @@ class Settings(BaseSettings):
     )
 
     # Server
+    environment: Literal["development", "staging", "production"] = Field(
+        default="development",
+        description="Deployment environment",
+    )
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO",
         description="Logging level",
@@ -68,6 +71,10 @@ class Settings(BaseSettings):
     debug: bool = Field(
         default=False,
         description="Debug mode",
+    )
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="Allowed CORS origins",
     )
 
     # Storage
@@ -97,15 +104,30 @@ class Settings(BaseSettings):
         description="Maximum upload size in MB",
     )
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> list[str] | Any:
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            if raw.startswith("["):
+                # Let pydantic parse JSON-style list in normal flow.
+                return value
+            return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return value
+
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
         """Validate security settings when running in production."""
-        environment = os.getenv("ENVIRONMENT", "development").lower()
-        if environment == "production":
+        if self.environment == "production":
             if self.jwt_secret == "change-me-in-production":
                 raise ValueError("JWT_SECRET must be configured in production")
             if len(self.jwt_secret) < 32:
                 raise ValueError("JWT_SECRET must be at least 32 characters in production")
+            if "*" in self.cors_origins:
+                raise ValueError("CORS_ORIGINS cannot include '*' in production")
         return self
 
     @property

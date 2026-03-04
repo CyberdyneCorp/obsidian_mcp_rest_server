@@ -108,6 +108,7 @@ JWT_SECRET=your-secret-key-min-32-chars
 JWT_ISSUER=obsidian-vault-server
 MAX_UPLOAD_SIZE_MB=100
 ENVIRONMENT=development
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 RATE_LIMIT_ENABLED=true
 ```
 
@@ -132,6 +133,15 @@ uv run uvicorn app.main:app --reload --port 8001
 The server will be available at `http://localhost:8001`.
 
 ## API Endpoints
+
+### API Versioning
+
+- Canonical API base path: `/v1`
+- Backward compatibility: existing unversioned endpoints remain available for now.
+- Compatibility policy:
+  - New non-breaking features may be added to `/v1`.
+  - Breaking changes require a new version (for example, `/v2`).
+  - Unversioned routes are considered compatibility aliases and may be deprecated in a future major release.
 
 ### Authentication
 
